@@ -1,0 +1,35 @@
+# dependencies & build
+node_modules
+dist
+dist-ssr
+*.local
+.vite
+
+# env & secrets
+.env
+.env.*
+!.env.example
+
+# database (SQLite dev)
+backend/prisma/*.db
+backend/prisma/*.db-journal
+
+# uploaded menu photos (local hosting)
+backend/uploads
+backend/test/.uploads
+
+# test artifacts
+backend/coverage
+
+# TypeScript incremental metadata
+*.tsbuildinfo
+
+# local agent/runtime state
+.agents
+.codex
+.claude
+.omc
+.omx
+
+# os
+.DS_Store

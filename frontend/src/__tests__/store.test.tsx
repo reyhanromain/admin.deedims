@@ -1,0 +1,221 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, renderHook, waitFor } from '@testing-library/react'
+
+vi.mock('../api', async (orig) => {
+  const actual = await orig<typeof import('../api')>()
+  const fn = () => vi.fn()
+  return {
+    ...actual,
+    getToken: vi.fn(() => 'tok'),
+    setToken: vi.fn(),
+    clearToken: vi.fn(),
+    uploadImage: vi.fn(async () => '/uploads/x.png'),
+    api: {
+      login: fn(), me: fn(), dashboard: fn(), order: fn(),
+      ordersList: fn(), customersList: fn(), customerOrders: fn(), preorderOrders: fn(), subscribersList: fn(), preordersList: fn(),
+      menusList: fn(), stockList: fn(), usersList: fn(), settingsList: fn(),
+      adjustStock: fn(), createStock: fn(), createMenu: fn(), updateMenu: fn(), toggleMenu: fn(),
+      createPreorder: fn(), openPreorder: fn(), closePreorder: fn(), completePreorder: fn(),
+      patchOrder: fn(), approveCancel: fn(), rejectCancel: fn(), blockCustomer: fn(),
+      createUser: fn(), updateUser: fn(), deleteUser: fn(), updateSetting: fn(),
+    },
+  }
+})
+
+import * as apiMod from '../api'
+import { AdminProvider, useAdmin } from '../store'
+
+const api = apiMod.api as unknown as Record<string, ReturnType<typeof vi.fn>>
+const getTokenMock = apiMod.getToken as ReturnType<typeof vi.fn>
+
+const paged = (rows: any[], extra: Record<string, unknown> = {}) => ({ rows, total: rows.length, page: 1, limit: 20, totalPages: 1, ...extra })
+
+const orderRow = { id: 1, code: 'DD-1', customer: 'Sari', username: 'sari', createdAt: '12 Jun, 09:13', itemsSummary: 'Menu A x1', total: 10000, status: 'confirmed', pay: 'pending', cancelRequested: true }
+const orderDetail = { id: 1, code: 'DD-1', customer: 'Sari', username: 'sari', createdAt: '12 Jun, 09:13', updatedAt: '12 Jun, 10:00', status: 'confirmed', pay: 'pending', adminNotes: '', cancelRequested: true, total: 10000, items: [{ name: 'Menu A', meta: '', qty: 1, price: 10000, addon: false }], poTitle: 'PO Open', poDate: '14 Jun 2026' }
+const menuRow = { id: 1, name: 'Menu A', description: '', basePrice: 10000, active: true, isAddon: false, image: '', variants: [{ name: 'Reg', price: 10000, stockId: 1, qty: 2 }], addons: [2] }
+const stockRow = { id: 1, label: 's1', name: 'Stock 1', quantity: 50, unit: 'pcs' }
+const poOpen = { id: 1, title: 'PO Open', description: '', status: 'open', date: '14 Jun 2026', note: '', orderCount: 1, revenue: 10000 }
+const poDraft = { id: 2, title: 'PO Draft', description: '', status: 'draft', date: 'TBD', note: '—', orderCount: 0, revenue: 0 }
+const custRow = { id: 1, username: 'sari', name: 'Sari', blocked: false, joined: '02 May 2026', orderCount: 1, totalSpent: 10000, lastOrder: '12 Jun, 09:13', reminderActive: true }
+const users = [{ id: 1, username: 'admin', name: 'Dee Rahma', password: '', super: true }, { id: 2, username: 'staff', name: 'Staff', password: '', super: false }]
+const dashboard = { kpis: { newOrders: 0, batchOrders: 1, batchRevenue: 10000, cancelRequests: 1 }, openPreorder: { id: 1, title: 'PO Open', date: '14 Jun 2026', note: 'n' }, recentOrders: [{ id: 1, code: 'DD-1', customer: 'Sari', itemsSummary: 'Menu A x1', total: 10000, status: 'submitted' }], lowStock: [{ id: 2, name: 'Stock 2', quantity: 5, unit: 'pcs' }] }
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  getTokenMock.mockReturnValue('tok')
+  api.me.mockResolvedValue({ id: 1, username: 'admin', fullName: 'Dee Rahma', isSuper: true })
+  api.dashboard.mockResolvedValue(dashboard)
+  api.order.mockResolvedValue(orderDetail)
+  api.ordersList.mockResolvedValue(paged([orderRow], { counts: { all: 1, submitted: 0, confirmed: 1, ready: 0, completed: 0, cancelled: 0 } }))
+  api.customersList.mockResolvedValue(paged([custRow]))
+  api.customerOrders.mockResolvedValue(paged([{ id: 1, code: 'DD-1', createdAt: '12 Jun, 09:13', itemsSummary: 'Menu A x1', total: 10000, status: 'confirmed' }]))
+  api.subscribersList.mockResolvedValue(paged([{ username: 'sari', name: 'sari', since: '02 May 2026', active: true }], { counts: { active: 1, inactive: 0 } }))
+  api.preordersList.mockResolvedValue(paged([poOpen, poDraft]))
+  api.preorderOrders.mockResolvedValue(paged([orderRow]))
+  api.menusList.mockResolvedValue(paged([menuRow]))
+  api.stockList.mockResolvedValue(paged([stockRow]))
+  api.usersList.mockResolvedValue(paged(users))
+  api.settingsList.mockResolvedValue(paged([{ id: 7, label: 'k', desc: 'd', value: 'v', textarea: false }]))
+})
+
+const render = () => renderHook(() => useAdmin(), { wrapper: AdminProvider }).result
+async function mountAuthed() {
+  const r = render()
+  await waitFor(() => expect(r.current.authed).toBe(true))
+  return r
+}
+async function goto(r: ReturnType<typeof render>, screen: any) {
+  act(() => r.current.goScreen(screen))
+  await waitFor(() => expect(r.current.isScreenReady()).toBe(true))
+}
+
+describe('session gate (lazy)', () => {
+  it('mount → /me + /dashboard saja (bukan list lain)', async () => {
+    const r = await mountAuthed()
+    await waitFor(() => expect(r.current.isScreenReady()).toBe(true))
+    expect(api.me).toHaveBeenCalledTimes(1)
+    expect(api.dashboard).toHaveBeenCalledTimes(1)
+    expect(api.ordersList).not.toHaveBeenCalled()
+    expect(api.menusList).not.toHaveBeenCalled()
+    expect(r.current.dashboard?.kpis.batchRevenue).toBe(10000)
+    expect(r.current.currentUser).toMatchObject({ username: 'admin', super: true })
+  })
+})
+
+describe('lazy per-layar', () => {
+  it('buka Orders → ordersList dipanggil, list lain tidak', async () => {
+    const r = await mountAuthed()
+    await goto(r, 'orders')
+    expect(api.ordersList).toHaveBeenCalledTimes(1)
+    expect(api.customersList).not.toHaveBeenCalled()
+    expect(r.current.lists.orders.rows).toHaveLength(1)
+    expect(r.current.orderCounts).toMatchObject({ all: 1, confirmed: 1 })
+  })
+
+  it('setOrderFilter memicu refetch dengan status', async () => {
+    const r = await mountAuthed()
+    await goto(r, 'orders')
+    act(() => r.current.setOrderFilter('confirmed'))
+    await waitFor(() => expect(api.ordersList).toHaveBeenCalledWith(expect.objectContaining({ status: 'confirmed', page: 1 })))
+    expect(r.current.orderFilter).toBe('confirmed')
+  })
+
+  it('setListPage memicu refetch halaman', async () => {
+    const r = await mountAuthed()
+    await goto(r, 'orders')
+    act(() => r.current.setListPage('orders', 2))
+    await waitFor(() => expect(api.ordersList).toHaveBeenCalledWith(expect.objectContaining({ page: 2 })))
+  })
+})
+
+describe('menus', () => {
+  it('toggleMenuActive → API + flip active', async () => {
+    api.toggleMenu.mockResolvedValue({ id: 1, isActive: false })
+    const r = await mountAuthed()
+    await goto(r, 'menus')
+    act(() => r.current.toggleMenuActive(1))
+    await waitFor(() => expect((r.current.lists.menus.rows as any[]).find((m) => m.id === 1).active).toBe(false))
+    expect(api.toggleMenu).toHaveBeenCalledWith(1)
+  })
+
+  it('saveMenu baru → createMenu body + prepend', async () => {
+    api.createMenu.mockResolvedValue({ id: 9, name: 'Baru', description: null, basePrice: 9000, isActive: true, isAddon: false, imageUrl: null, variants: [], addons: [] })
+    const r = await mountAuthed()
+    await goto(r, 'menus')
+    act(() => r.current.openMenuEditor(null))
+    act(() => r.current.updateDraft({ name: 'Baru', basePrice: 9000 }))
+    act(() => r.current.saveMenu())
+    await waitFor(() => expect(api.createMenu).toHaveBeenCalledWith(expect.objectContaining({ name: 'Baru', basePrice: 9000, isActive: true })))
+    await waitFor(() => expect((r.current.lists.menus.rows as any[]).some((m) => m.id === 9)).toBe(true))
+  })
+})
+
+describe('preorders single-open', () => {
+  it('openPreorder ditolak saat ada open (tanpa API)', async () => {
+    const r = await mountAuthed()
+    await goto(r, 'preorders')
+    act(() => r.current.openPreorder(2))
+    await waitFor(() => expect(r.current.toast).toContain('hanya boleh satu open'))
+    expect(api.openPreorder).not.toHaveBeenCalled()
+  })
+})
+
+describe('preorder drill-down', () => {
+  it('selectPreorder → muat order PO tsb', async () => {
+    const r = await mountAuthed()
+    await goto(r, 'preorders')
+    act(() => r.current.selectPreorder(2))
+    await waitFor(() => expect(api.preorderOrders).toHaveBeenCalledWith(2, expect.objectContaining({ page: 1 })))
+    await waitFor(() => expect(r.current.preorderOrders.rows).toHaveLength(1))
+  })
+})
+
+describe('patchOrder', () => {
+  it('cancelRequested:false + cancelled → approveCancel + refetch detail', async () => {
+    api.approveCancel.mockResolvedValue({ status: 'approved' })
+    const r = await mountAuthed()
+    await goto(r, 'orders')
+    act(() => r.current.selectOrder(1))
+    await waitFor(() => expect(r.current.selectedOrder?.id).toBe(1))
+    act(() => r.current.patchOrder(1, { status: 'cancelled', pay: 'cancelled', cancelRequested: false }))
+    await waitFor(() => expect(api.approveCancel).toHaveBeenCalledWith(1))
+    expect(api.rejectCancel).not.toHaveBeenCalled()
+  })
+
+  it('ubah status → PATCH dengan orderStatus', async () => {
+    api.patchOrder.mockResolvedValue({ id: 1, status: 'ready', pay: 'pending', adminNotes: '', cancelRequested: true, updatedAt: '2026-06-12T03:00:00Z' })
+    const r = await mountAuthed()
+    await goto(r, 'orders')
+    act(() => r.current.selectOrder(1))
+    await waitFor(() => expect(r.current.selectedOrder?.id).toBe(1))
+    act(() => r.current.patchOrder(1, { status: 'ready' }))
+    await waitFor(() => expect(api.patchOrder).toHaveBeenCalledWith(1, { orderStatus: 'ready' }))
+  })
+})
+
+describe('users guard', () => {
+  it('deleteUser super → ditolak; staff → API id', async () => {
+    api.deleteUser.mockResolvedValue({ ok: true })
+    const r = await mountAuthed()
+    await goto(r, 'users')
+    act(() => r.current.deleteUser('admin'))
+    await waitFor(() => expect(r.current.toast).toContain('Super User tidak bisa dihapus'))
+    expect(api.deleteUser).not.toHaveBeenCalled()
+    act(() => r.current.deleteUser('staff'))
+    await waitFor(() => expect(api.deleteUser).toHaveBeenCalledWith(2))
+  })
+})
+
+describe('stock optimistic & customers', () => {
+  it('adjustStock optimistic sebelum API resolve', async () => {
+    api.adjustStock.mockReturnValue(new Promise(() => {}))
+    const r = await mountAuthed()
+    await goto(r, 'stock')
+    act(() => r.current.adjustStock(1, 5))
+    expect((r.current.lists.stock.rows as any[]).find((x) => x.id === 1).quantity).toBe(55)
+    expect(api.adjustStock).toHaveBeenCalledWith(1, 5)
+  })
+
+  it('toggleBlockCustomer pakai id', async () => {
+    api.blockCustomer.mockResolvedValue({ id: 1, blocked: true })
+    const r = await mountAuthed()
+    await goto(r, 'customers')
+    act(() => r.current.toggleBlockCustomer('sari'))
+    await waitFor(() => expect(api.blockCustomer).toHaveBeenCalledWith(1, true))
+    await waitFor(() => expect((r.current.lists.customers.rows as any[]).find((c) => c.username === 'sari').blocked).toBe(true))
+  })
+})
+
+describe('doLogin', () => {
+  it('login → token + currentUser + authed', async () => {
+    getTokenMock.mockReturnValue(null)
+    api.login.mockResolvedValue({ token: 't0ken', user: { id: 1, username: 'admin', fullName: 'Dee Rahma', isSuper: true } })
+    const r = render()
+    expect(r.current.authed).toBe(false)
+    act(() => r.current.doLogin())
+    await waitFor(() => expect(r.current.authed).toBe(true))
+    expect(apiMod.setToken).toHaveBeenCalledWith('t0ken')
+    expect(r.current.currentUser).toMatchObject({ username: 'admin' })
+    expect(r.current.toast).toContain('Selamat datang, Dee')
+  })
+})

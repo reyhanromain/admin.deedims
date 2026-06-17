@@ -1,0 +1,17 @@
+# <type>(optional-scope): <short summary>
+#
+# Body: explain why the change is needed and anything reviewers should know.
+# Footer: include issue links or breaking-change notes when relevant.
+#
+# Types:
+# feat: user-facing feature
+# fix: bug fix
+# docs: documentation only
+# test: test coverage only
+# refactor: behavior-preserving code change
+# chore: tooling, release, or maintenance
+#
+# Examples:
+# feat(preorders): add customer pickup notes
+# fix(api): reject duplicate open preorder windows
+# chore(release): v2.0.1

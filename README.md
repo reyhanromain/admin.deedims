@@ -1,0 +1,101 @@
+# Deedims
+
+Monorepo untuk **Deedims** — pre-order dimsum lewat bot Telegram + admin CMS.
+
+```
+deedims-v1/
+  frontend/   React + Vite SPA (admin CMS)
+  backend/    grammy (bot) + Fastify (API CMS) + Prisma + SQLite
+  docs/        desain database & catatan
+  docker-compose.yml
+```
+
+Backend adalah **satu proses** yang menjalankan bot Telegram, API CMS, dan cron retensi —
+semuanya berbagi satu Prisma Client ke satu file SQLite (satu penulis, aman).
+
+## Arsitektur
+
+```
+Browser ──▶ frontend (nginx, :8080) ──/api/──▶ backend (Fastify, :3000)
+                                                   ├─ grammY  (bot Telegram)
+                                                   ├─ cron    (retensi bot_messages, harian 00:00 WIB)
+                                                   └─ Prisma ─▶ SQLite (volume)
+```
+
+Timezone: data **disimpan UTC** di DB; tampilan & penjadwalan pakai **Asia/Jakarta**.
+
+## Jalankan dengan Docker (rekomendasi)
+
+```bash
+# dari root repo
+docker compose up --build
+# frontend → http://localhost:8080   (API diproxy di /api)
+# backend  → http://localhost:3100   (langsung, untuk debug)
+
+# seed data contoh (sekali, setelah container backend jalan)
+docker compose exec backend npm run seed
+```
+
+Set `BOT_TOKEN` (dan sebaiknya `JWT_SECRET`) lewat environment untuk mengaktifkan bot:
+
+```bash
+BOT_TOKEN=123:abc JWT_SECRET=ganti-ini docker compose up --build
+```
+
+## Jalankan lokal (dev)
+
+```bash
+# backend
+cd backend
+cp .env.example .env
+npm install
+npx prisma migrate dev      # buat DB + migrasi
+npm run seed                # data contoh
+npm run dev                 # API :3100 (+ bot kalau BOT_TOKEN diisi)
+
+# frontend (terminal lain)
+cd frontend
+npm install
+npm run dev                 # http://localhost:5173
+```
+
+**Login CMS:** `admin` / `deedims123` (super user). Admin lain lihat `backend/prisma/seed.ts`.
+
+## Test
+
+```bash
+cd backend && npm test    # 64 test: integration (app.inject + SQLite test) + unit
+cd frontend && npm test   # 27 test: mappers (pure) + store/lazy-load (api di-mock, jsdom)
+```
+
+**Backend** memakai DB SQLite terpisah (`prisma/test.db`, dibuat & dihapus otomatis) dan tidak
+menyentuh `dev.db`. Mencakup auth, aturan super-user, alur cancellation order, reset
+`telegram_file_id`, aturan single-open PO, validasi upload (415/413/401), purge retensi, dan
+helper timezone/password.
+
+## Versi & Git Workflow
+
+Versi produk tunggal disimpan di [`VERSION`](VERSION), disinkronkan dengan `backend/package.json`
+dan `frontend/package.json`, lalu dirilis dengan tag Git `vX.Y.Z`. Branch, commit, PR, changelog,
+dan release flow lengkap ada di [`docs/versioning-workflow.md`](docs/versioning-workflow.md).
+
+**Frontend** menguji mapper API↔FE (+ format Asia/Jakarta) dan logika store (login, **lazy-load
+per layar**: muat-sekali/dedup/cache/refresh, toggle menu, saveMenu, single-open PO, routing
+cancellation patchOrder, guard super-user, optimistic stock) dengan modul API di-mock.
+
+## Catatan
+
+- Database design: [`docs/cms-database-design.md`](docs/cms-database-design.md).
+- **Response envelope seragam** `{ data, meta, error }` di semua endpoint (error: `{message,code}` +
+  HTTP status). List **dipaginasi** (`?page=&limit=`) dengan `meta.{page,limit,total,totalPages}`
+  (orders + `meta.counts`); agregat (KPI dashboard, stats per-PO/customer) dihitung **server-side**.
+  Tiap endpoint mengembalikan **DTO ramping** (tanpa data berlebih) — mis. Dashboard menarik
+  ringkasan ~1KB, bukan seluruh order.
+- Frontend **tersambung ke API** lewat `frontend/src/api.ts` (JWT di localStorage, mapper API↔FE,
+  format tanggal Asia/Jakarta, unwrap envelope). Store (`src/store.tsx`) memuat data **lazy per
+  layar** (paginated view per list; auth via 1 call `me`), dengan **Pager** di tiap list & tombol
+  **Refresh** manual di Header. Dev memakai proxy Vite (`/api` & `/uploads` → `:3100`).
+  Endpoint tersedia: auth, users, customers, stock, settings, bot-messages, orders (+ cancellation
+  review), menus (+ variants/add-ons), pre-orders (+ aturan single-open), subscribers, dan upload
+  foto menu (`POST /api/uploads` → simpan lokal, disajikan di `/uploads/*`, jadi `menus.imageUrl`).
+- Password disimpan **hashed** (bcrypt). Ganti `JWT_SECRET` di produksi.

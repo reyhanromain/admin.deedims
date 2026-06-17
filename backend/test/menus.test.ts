@@ -1,0 +1,71 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import type { FastifyInstance } from 'fastify'
+import { makeApp, resetDb, tokenFor, authH, prisma, data, meta } from './helpers'
+
+let app: FastifyInstance
+let token: string
+
+beforeAll(async () => { app = await makeApp() })
+afterAll(async () => { await app.close(); await prisma.$disconnect() })
+beforeEach(async () => { await resetDb(); token = await tokenFor(app) })
+
+describe('menus', () => {
+  it('list ramping: variant {name,price,stockId,qty} (tanpa id/telegramFileId) + paginated', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/menus', headers: authH(token) })
+    const a = data(res).find((m: { id: number }) => m.id === 1)
+    expect(a.variants[0]).toEqual({ name: 'Reg', price: 10000, stockId: 1, qty: 2 })
+    expect(a).not.toHaveProperty('telegramFileId')
+    expect(a.addons).toEqual([2])
+    expect(meta(res)).toMatchObject({ page: 1, total: 2 })
+  })
+
+  it('create menu dengan variant + addon → 201', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/menus', headers: authH(token),
+      payload: { name: 'Baru', basePrice: 9000, variants: [{ name: 'V', price: 9000, stockId: 1, qty: 1 }], addons: [2] },
+    })
+    expect(res.statusCode).toBe(201)
+    expect(data(res).variants[0]).toEqual({ name: 'V', price: 9000, stockId: 1, qty: 1 })
+    expect(data(res).addons).toEqual([2])
+  })
+
+  it('ganti imageUrl me-reset telegramFileId (aturan hybrid)', async () => {
+    await prisma.menu.update({ where: { id: 1 }, data: { imageUrl: '/uploads/a.jpg', telegramFileId: 'CACHED' } })
+    const res = await app.inject({
+      method: 'PATCH', url: '/api/menus/1', headers: authH(token),
+      payload: { name: 'Menu A', basePrice: 10000, imageUrl: '/uploads/b.jpg', variants: [{ name: 'Reg', price: 10000, stockId: 1, qty: 2 }], addons: [2] },
+    })
+    expect(data(res).imageUrl).toBe('/uploads/b.jpg')
+    expect((await prisma.menu.findUniqueOrThrow({ where: { id: 1 } })).telegramFileId).toBeNull()
+  })
+
+  it('imageUrl sama → telegramFileId dipertahankan', async () => {
+    await prisma.menu.update({ where: { id: 1 }, data: { imageUrl: '/uploads/a.jpg', telegramFileId: 'CACHED' } })
+    await app.inject({
+      method: 'PATCH', url: '/api/menus/1', headers: authH(token),
+      payload: { name: 'Menu A', basePrice: 10000, imageUrl: '/uploads/a.jpg', variants: [{ name: 'Reg', price: 10000, stockId: 1, qty: 2 }], addons: [2] },
+    })
+    expect((await prisma.menu.findUniqueOrThrow({ where: { id: 1 } })).telegramFileId).toBe('CACHED')
+  })
+
+  it('patch mengganti variants & addons (tidak menumpuk)', async () => {
+    await app.inject({
+      method: 'PATCH', url: '/api/menus/1', headers: authH(token),
+      payload: { name: 'Menu A', basePrice: 10000, variants: [{ name: 'Solo', price: 12000, stockId: 2, qty: 3 }], addons: [] },
+    })
+    const m = await prisma.menu.findUniqueOrThrow({ where: { id: 1 }, include: { variants: true, addonLinks: true } })
+    expect(m.variants).toHaveLength(1)
+    expect(m.variants[0].price).toBe(12000)
+    expect(m.addonLinks).toHaveLength(0)
+  })
+
+  it('toggle → data {id,isActive}', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/menus/1/toggle', headers: authH(token) })
+    expect(data(res)).toEqual({ id: 1, isActive: false })
+  })
+
+  it('create tanpa nama → 400', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/menus', headers: authH(token), payload: { basePrice: 1 } })
+    expect(res.statusCode).toBe(400)
+  })
+})

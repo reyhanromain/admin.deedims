@@ -1,0 +1,302 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider     = "sqlite"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma" // tanpa FK constraint — relasi divalidasi di app
+}
+
+// ============================================================
+// [NEW] Khusus CMS
+// ============================================================
+
+/// Akun admin yang bisa login ke CMS. Auth via JWT.
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique           // lowercase, tanpa spasi
+  fullName  String   @map("full_name")
+  password  String                     // WAJIB hash (bcrypt/argon2) di produksi
+  isSuper   Boolean  @default(false) @map("is_super") // maks 1 super user (validasi app)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  blockedCustomers   Customer[]                  @relation("CustomerBlockedBy")
+  reviewedCancellations OrderCancellationRequest[] @relation("CancellationReviewer")
+
+  @@map("users")
+}
+
+/// Profil customer + status blokir. Dikelola CMS.
+model Customer {
+  id              Int       @id @default(autoincrement())
+  telegramUserId  BigInt?   @unique @map("telegram_user_id") // penghubung ke order/subscriber bot
+  username        String?                                    // telegram username (tanpa '@')
+  name            String?
+  joinedAt        DateTime? @map("joined_at")
+  blocked         Boolean   @default(false)
+  blockedAt       DateTime? @map("blocked_at")
+  blockedById     Int?      @map("blocked_by")
+  blockedBy       User?     @relation("CustomerBlockedBy", fields: [blockedById], references: [id])
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  messages        BotMessage[]
+
+  @@index([username])
+  @@index([blocked])
+  @@index([blockedById])
+  @@map("customers")
+}
+
+/// Permintaan pembatalan order yang perlu di-review admin.
+model OrderCancellationRequest {
+  id           Int       @id @default(autoincrement())
+  orderId      Int       @map("order_id")
+  order        Order     @relation(fields: [orderId], references: [id])
+  reason       String?
+  status       String    @default("pending") // pending | approved | rejected
+  requestedAt  DateTime  @default(now()) @map("requested_at")
+  reviewedById Int?      @map("reviewed_by")
+  reviewedBy   User?     @relation("CancellationReviewer", fields: [reviewedById], references: [id])
+  reviewedAt   DateTime? @map("reviewed_at")
+
+  @@index([orderId])
+  @@index([status])
+  @@index([reviewedById])
+  @@map("order_cancellation_requests")
+}
+
+/// Log semua pesan customer ⇄ bot. Ditulis oleh bot, dibaca CMS (lihat percakapan).
+/// `direction` membedakan incoming (customer) vs outgoing (bot).
+model BotMessage {
+  id                Int       @id @default(autoincrement())
+  telegramMessageId BigInt?   @map("telegram_message_id") // id pesan dari Telegram (dedup/reply ref)
+  telegramChatId    BigInt    @map("telegram_chat_id")    // chat asal (private = user id)
+  telegramUserId    BigInt?   @map("telegram_user_id")    // pengirim (null utk sistem)
+  direction         String    @default("incoming")        // incoming | outgoing
+  messageType       String    @default("text") @map("message_type") // text|command|photo|sticker|location|contact|callback|...
+  text              String?                               // teks / caption
+  telegramUsername  String?   @map("telegram_username")   // snapshot saat itu
+  customerName      String?   @map("customer_name")       // snapshot saat itu
+  isCommand         Boolean   @default(false) @map("is_command")
+  command           String?                               // mis. "/start", "/menu"
+  intent            String?                               // intent/handler/state yg bot pahami
+  telegramFileId    String?   @map("telegram_file_id")    // kalau pesan berisi media
+  rawPayload        String?   @map("raw_payload")         // JSON update mentah dari Telegram (TEXT)
+  customerId        Int?      @map("customer_id")
+  customer          Customer? @relation(fields: [customerId], references: [id])
+  orderId           Int?      @map("order_id")
+  order             Order?    @relation(fields: [orderId], references: [id])
+  preOrderId        Int?      @map("pre_order_id")
+  preOrder          PreOrder? @relation(fields: [preOrderId], references: [id])
+  telegramDate      DateTime? @map("telegram_date")       // waktu dari Telegram
+  receivedAt        DateTime  @default(now()) @map("received_at") // waktu server terima
+
+  @@index([telegramUserId])
+  @@index([telegramChatId])
+  @@index([customerId])
+  @@index([orderId])
+  @@index([preOrderId])
+  @@index([direction])
+  @@index([receivedAt])
+  @@map("bot_messages")
+}
+
+// ============================================================
+// [SHARED / EXTEND] Operasional — dipakai bersama bot
+// ============================================================
+
+/// [SHARED] Stock global.
+model StockItem {
+  id        Int      @id @default(autoincrement())
+  label     String   @unique
+  name      String
+  quantity  Int      @default(0)
+  unit      String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  variantUsages MenuVariantStockUsage[]
+
+  @@index([isActive])
+  @@map("stock_items")
+}
+
+/// [EXTEND] Menu utama & add-on. CMS menambah imageUrl + telegramFileId + isAddon.
+model Menu {
+  id             Int      @id @default(autoincrement())
+  name           String
+  description    String?
+  basePrice      Int      @default(0) @map("base_price")
+  isActive       Boolean  @default(true) @map("is_active")
+  imageUrl       String?  @map("image_url")              // [CMS] sumber kebenaran: path file lokal
+  telegramFileId String?  @map("telegram_file_id")       // [CMS] cache file_id utk re-send cepat via bot
+  isAddon        Boolean  @default(false) @map("is_addon") // [CMS] menu ini berperan sbg add-on
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  variants     MenuVariant[]
+  addonLinks   MenuAddon[]   @relation("MenuToAddon")    // add-on yang dipasang ke menu ini
+  asAddonLinks MenuAddon[]   @relation("AddonMenu")      // menu ini dipakai sbg add-on di mana
+
+  @@index([isActive])
+  @@map("menus")
+}
+
+/// [SHARED] Varian menu (menu tanpa varian tetap punya 1 default tersembunyi).
+model MenuVariant {
+  id        Int      @id @default(autoincrement())
+  menuId    Int      @map("menu_id")
+  menu      Menu     @relation(fields: [menuId], references: [id])
+  name      String?
+  price     Int
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  stockUsages MenuVariantStockUsage[]
+
+  @@index([menuId])
+  @@index([isActive])
+  @@map("menu_variants")
+}
+
+/// [SHARED] Mapping berapa stock dipotong per 1 qty varian.
+model MenuVariantStockUsage {
+  id            Int         @id @default(autoincrement())
+  menuVariantId Int         @map("menu_variant_id")
+  variant       MenuVariant @relation(fields: [menuVariantId], references: [id])
+  stockItemId   Int         @map("stock_item_id")
+  stockItem     StockItem   @relation(fields: [stockItemId], references: [id])
+  quantity      Int
+
+  @@index([menuVariantId])
+  @@index([stockItemId])
+  @@map("menu_variant_stock_usages")
+}
+
+/// [SHARED] Menu utama dipasangkan ke menu add-on.
+model MenuAddon {
+  id          Int      @id @default(autoincrement())
+  menuId      Int      @map("menu_id")
+  menu        Menu     @relation("MenuToAddon", fields: [menuId], references: [id])
+  addonMenuId Int      @map("addon_menu_id")
+  addonMenu   Menu     @relation("AddonMenu", fields: [addonMenuId], references: [id])
+  isRequired  Boolean  @default(false) @map("is_required")
+  maxQuantity Int      @default(1) @map("max_quantity")
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([menuId])
+  @@index([addonMenuId])
+  @@map("menu_addons")
+}
+
+/// [SHARED] Batch pre-order. Hanya 1 boleh status 'open' (validasi app).
+model PreOrder {
+  id              Int       @id @default(autoincrement())
+  title           String?
+  description     String?
+  status          String    @default("draft") // draft|open|closed|completed|cancelled
+  openedAt        DateTime? @map("opened_at")
+  closedAt        DateTime? @map("closed_at")
+  fulfillmentDate DateTime? @map("fulfillment_date")
+  fulfillmentNote String?   @map("fulfillment_note")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  orders   Order[]
+  messages BotMessage[]
+
+  @@index([status])
+  @@map("pre_orders")
+}
+
+/// [EXTEND] Header order. CMS menambah cancelRequested + relasi cancellation.
+model Order {
+  id              Int      @id @default(autoincrement())
+  orderCode       String   @unique @map("order_code")
+  preOrderId      Int      @map("pre_order_id")
+  preOrder        PreOrder @relation(fields: [preOrderId], references: [id])
+  telegramUserId  BigInt?  @map("telegram_user_id")
+  telegramUsername String? @map("telegram_username")
+  customerName    String?  @map("customer_name")
+  paymentMethod   String   @default("cod") @map("payment_method")
+  paymentStatus   String   @default("pending") @map("payment_status") // pending|paid|cancelled
+  orderStatus     String   @default("submitted") @map("order_status")  // submitted|confirmed|ready|completed|cancelled
+  subtotalAmount  Int      @default(0) @map("subtotal_amount")
+  totalAmount     Int      @default(0) @map("total_amount")
+  notes           String?
+  adminNotes      String?  @map("admin_notes")
+  cancelRequested Boolean  @default(false) @map("cancel_requested") // [CMS] filter cepat badge/KPI
+  submittedAt     DateTime? @map("submitted_at")
+  confirmedAt     DateTime? @map("confirmed_at")
+  cancelledAt     DateTime? @map("cancelled_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  items                OrderItem[]
+  cancellationRequests OrderCancellationRequest[]
+  messages             BotMessage[]
+
+  @@index([preOrderId])
+  @@index([telegramUserId])
+  @@index([orderStatus])
+  @@index([updatedAt])
+  @@map("orders")
+}
+
+/// [SHARED] Item order final (snapshot agar histori tidak berubah).
+model OrderItem {
+  id                  Int      @id @default(autoincrement())
+  orderId             Int      @map("order_id")
+  order               Order    @relation(fields: [orderId], references: [id])
+  parentOrderItemId   Int?     @map("parent_order_item_id") // add-on menempel ke main item
+  menuId              Int?     @map("menu_id")
+  menuVariantId       Int?     @map("menu_variant_id")
+  menuNameSnapshot    String   @map("menu_name_snapshot")
+  variantNameSnapshot String?  @map("variant_name_snapshot")
+  unitPrice           Int      @map("unit_price")
+  quantity            Int
+  lineTotal           Int      @map("line_total")
+  notes               String?
+  sortOrder           Int      @default(0) @map("sort_order")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@index([orderId])
+  @@index([parentOrderItemId])
+  @@map("order_items")
+}
+
+/// [SHARED] Subscriber reminder pre-order.
+model ReminderSubscriber {
+  id             Int       @id @default(autoincrement())
+  telegramUserId BigInt    @unique @map("telegram_user_id")
+  telegramUsername String? @map("telegram_username")
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  unsubscribedAt DateTime? @map("unsubscribed_at")
+
+  @@index([isActive])
+  @@map("pre_order_reminder_subscribers")
+}
+
+/// [EXTEND] Konfigurasi bot. CMS menambah description + inputType + sortOrder.
+model Setting {
+  id          Int      @id @default(autoincrement())
+  label       String   @unique
+  value       String?
+  description String?                          // [CMS] teks bantuan di layar Settings
+  inputType   String   @default("text") @map("input_type") // [CMS] 'text' | 'textarea'
+  sortOrder   Int      @default(0) @map("sort_order")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}

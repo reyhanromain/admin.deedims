@@ -1,0 +1,36 @@
+html, body { margin: 0; padding: 0; }
+* { box-sizing: border-box; }
+
+body {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+
+#root {
+  height: 100vh;
+}
+
+input, textarea, button, select { font-family: inherit; }
+button { cursor: pointer; }
+
+input::placeholder, textarea::placeholder { color: inherit; opacity: 0.45; }
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Thin, theme-friendly scrollbars for the main scroll area */
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: rgba(138,114,99,0.35); border-radius: 99px; }
+*::-webkit-scrollbar-track { background: transparent; }

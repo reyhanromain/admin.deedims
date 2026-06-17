@@ -1,0 +1,702 @@
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
+import {
+  api,
+  ApiError,
+  clearToken,
+  fmtDateTime,
+  getToken,
+  mapMenu,
+  mapPreorderRow,
+  mapStock,
+  mapUser,
+  menuToApi,
+  setToken,
+  uploadImage,
+} from './api'
+import type {
+  CustomerRow,
+  DashboardData,
+  Menu,
+  MenuDraft,
+  OrderDetail,
+  OrderRow,
+  OrderStatus,
+  PreorderRow,
+  Screen,
+  Setting,
+  StockItem,
+  User,
+  UserDraft,
+} from './types'
+
+export type EditMenuId = number | 'new' | null
+export type ListKey = 'orders' | 'customers' | 'subscribers' | 'preorders' | 'menus' | 'stock' | 'users' | 'settings'
+
+/** Koleksi list yang dibutuhkan tiap layar (dashboard pakai summary tersendiri). */
+export const SCREEN_LISTS: Record<Screen, ListKey[]> = {
+  dashboard: [],
+  preorders: ['preorders'],
+  orders: ['orders'],
+  customers: ['customers'],
+  menus: ['menus', 'stock'],
+  stock: ['stock'],
+  subscribers: ['subscribers'],
+  users: ['users'],
+  settings: ['settings'],
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+interface ListState {
+  rows: any[]
+  total: number
+  page: number
+  limit: number
+  totalPages: number
+  loaded: boolean
+  loading: boolean
+}
+const emptyList = (): ListState => ({ rows: [], total: 0, page: 1, limit: 20, totalPages: 1, loaded: false, loading: false })
+
+const LIST_FETCHERS: Record<ListKey, (p: { page: number; limit: number; status?: string }) => Promise<{ rows: any[]; total: number; page: number; limit: number; totalPages: number; counts?: Record<string, number> }>> = {
+  orders: (p) => api.ordersList(p),
+  customers: (p) => api.customersList(p),
+  subscribers: (p) => api.subscribersList(p),
+  preorders: (p) => api.preordersList(p),
+  menus: (p) => api.menusList(p),
+  stock: (p) => api.stockList(p),
+  users: (p) => api.usersList(p),
+  settings: (p) => api.settingsList(p),
+}
+
+interface CurrentUser { username: string; name: string; super: boolean }
+
+interface State {
+  authed: boolean
+  booting: boolean
+  currentUser: CurrentUser | null
+  loginUser: string
+  loginPass: string
+  profileOpen: boolean
+  dark: boolean
+  sidebarCollapsed: boolean
+  screen: Screen
+  orderFilter: 'all' | OrderStatus
+  orderCounts: Record<string, number>
+  subscriberCounts: { active: number; inactive: number }
+  selectedOrderId: number | null
+  selectedOrder: OrderDetail | null
+  selectedOrderLoading: boolean
+  selectedCustomerU: string | null
+  customerOrders: ListState
+  selectedPreorderId: number | null
+  preorderOrders: ListState
+  expandedMenuId: number | null
+  showPoForm: boolean
+  poTitle: string
+  poDesc: string
+  poDate: string
+  poNote: string
+  showStockForm: boolean
+  sName: string
+  sLabel: string
+  sQty: string
+  sUnit: string
+  editMenuId: EditMenuId
+  menuDraft: MenuDraft | null
+  showUserForm: boolean
+  uName: string
+  uFull: string
+  uPass: string
+  editUserU: string | null
+  userDraft: UserDraft | null
+  lightboxImage: string | null
+  toast: string | null
+  dashboard: DashboardData | null
+  dashboardLoaded: boolean
+  dashboardLoading: boolean
+  lists: Record<ListKey, ListState>
+}
+
+const initialLists = (): Record<ListKey, ListState> => ({
+  orders: emptyList(), customers: emptyList(), subscribers: emptyList(), preorders: emptyList(),
+  menus: emptyList(), stock: emptyList(), users: emptyList(), settings: emptyList(),
+})
+
+const initialState: State = {
+  authed: false,
+  booting: !!getToken(),
+  currentUser: null,
+  loginUser: '',
+  loginPass: '',
+  profileOpen: false,
+  dark: localStorage.getItem('deedims_dark') === '1',
+  sidebarCollapsed: false,
+  screen: 'dashboard',
+  orderFilter: 'all',
+  orderCounts: {},
+  subscriberCounts: { active: 0, inactive: 0 },
+  selectedOrderId: null,
+  selectedOrder: null,
+  selectedOrderLoading: false,
+  selectedCustomerU: null,
+  customerOrders: emptyList(),
+  selectedPreorderId: null,
+  preorderOrders: emptyList(),
+  expandedMenuId: null,
+  showPoForm: false, poTitle: '', poDesc: '', poDate: '', poNote: '',
+  showStockForm: false, sName: '', sLabel: '', sQty: '', sUnit: '',
+  editMenuId: null, menuDraft: null,
+  showUserForm: false, uName: '', uFull: '', uPass: '',
+  editUserU: null, userDraft: null,
+  lightboxImage: null,
+  toast: null,
+  dashboard: null,
+  dashboardLoaded: false,
+  dashboardLoading: false,
+  lists: initialLists(),
+}
+
+export interface AdminStore extends State {
+  set: (patch: Partial<State>) => void
+  showToast: (msg: string) => void
+  // data
+  ensureScreen: () => void
+  refresh: () => void
+  isScreenReady: () => boolean
+  isScreenLoading: () => boolean
+  setListPage: (key: ListKey, page: number) => void
+  setOrderFilter: (status: 'all' | OrderStatus) => void
+  // auth
+  doLogin: () => void
+  doLogout: () => void
+  // navigation
+  goScreen: (screen: Screen) => void
+  selectOrder: (id: number) => void
+  selectPreorder: (id: number) => void
+  setPreorderOrdersPage: (page: number) => void
+  // orders
+  patchOrder: (id: number, patch: Partial<OrderDetail>) => void
+  // preorders
+  openPreorder: (id: number) => void
+  closePreorder: (id: number) => void
+  completePreorder: (id: number) => void
+  createPo: () => void
+  // customers
+  toggleBlockCustomer: (username: string) => void
+  // menus
+  toggleMenuActive: (id: number) => void
+  openMenuEditor: (menu: Menu | null) => void
+  closeMenuEditor: () => void
+  updateDraft: (patch: Partial<MenuDraft>) => void
+  updateVariant: (i: number, patch: Partial<Menu['variants'][number]>) => void
+  addVariant: () => void
+  removeVariant: (i: number) => void
+  toggleAddon: (id: number) => void
+  setDraftImageFromFile: (file: File) => void
+  saveMenu: () => void
+  // stock
+  adjustStock: (id: number, delta: number) => void
+  createStock: () => void
+  // users
+  createUser: () => void
+  openUserEditor: (u: User) => void
+  closeUserEditor: () => void
+  updateUserDraft: (patch: Partial<UserDraft>) => void
+  saveUser: () => void
+  deleteUser: (username: string) => void
+  // settings
+  updateSetting: (index: number, value: string) => void
+  // image lightbox
+  openImage: (img: string) => void
+  closeLightbox: () => void
+}
+
+const AdminContext = createContext<AdminStore | null>(null)
+
+export function AdminProvider({ children }: { children: ReactNode }) {
+  const [state, setState] = useState<State>(initialState)
+  const stateRef = useRef(state)
+  stateRef.current = state
+  const toastTimer = useRef<ReturnType<typeof setTimeout>>()
+  const debouncers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const inflight = useRef<Set<string>>(new Set())
+  const listLoaded = useRef<Set<ListKey>>(new Set())
+  const dashLoaded = useRef(false)
+
+  const set = useCallback((patch: Partial<State>) => setState((s) => ({ ...s, ...patch })), [])
+  const update = useCallback((fn: (s: State) => Partial<State>) => setState((s) => ({ ...s, ...fn(s) })), [])
+
+  const showToast = useCallback((msg: string) => {
+    clearTimeout(toastTimer.current)
+    setState((s) => ({ ...s, toast: msg }))
+    toastTimer.current = setTimeout(() => setState((s) => ({ ...s, toast: null })), 2600)
+  }, [])
+
+  const fail = useCallback((e: unknown) => {
+    if (e instanceof ApiError && e.status === 401) {
+      clearToken()
+      listLoaded.current.clear()
+      inflight.current.clear()
+      setState((s) => ({ ...s, authed: false, booting: false }))
+      showToast('Sesi berakhir, silakan login lagi')
+    } else {
+      showToast(e instanceof ApiError ? e.message : 'Terjadi kesalahan')
+    }
+  }, [showToast])
+
+  const debounceSave = useCallback((key: string, fn: () => void, delay = 600) => {
+    clearTimeout(debouncers.current[key])
+    debouncers.current[key] = setTimeout(fn, delay)
+  }, [])
+
+  const setListLoading = (key: ListKey, loading: boolean) =>
+    setState((s) => ({ ...s, lists: { ...s.lists, [key]: { ...s.lists[key], loading } } }))
+
+  // Muat satu list (dedup in-flight; skip kalau sudah loaded kecuali force/ganti page/status).
+  const loadList = useCallback((key: ListKey, opts: { page?: number; status?: string; force?: boolean } = {}) => {
+    const ik = `list:${key}`
+    if (inflight.current.has(ik)) return
+    if (opts.page === undefined && opts.status === undefined && !opts.force && listLoaded.current.has(key)) return
+
+    inflight.current.add(ik)
+    setListLoading(key, true)
+    void (async () => {
+      try {
+        const cur = stateRef.current
+        const page = opts.page ?? cur.lists[key].page
+        const status = key === 'orders' ? (opts.status ?? cur.orderFilter) : undefined
+        const res = await LIST_FETCHERS[key]({ page, limit: cur.lists[key].limit, status })
+        listLoaded.current.add(key)
+        setState((s) => ({
+          ...s,
+          orderCounts: key === 'orders' && res.counts ? res.counts : s.orderCounts,
+          subscriberCounts: key === 'subscribers' && res.counts ? (res.counts as { active: number; inactive: number }) : s.subscriberCounts,
+          lists: { ...s.lists, [key]: { rows: res.rows, total: res.total, page: res.page, limit: res.limit, totalPages: res.totalPages, loaded: true, loading: false } },
+        }))
+      } catch (e) {
+        setListLoading(key, false)
+        fail(e)
+      } finally {
+        inflight.current.delete(ik)
+      }
+    })()
+  }, [fail])
+
+  const loadDashboard = useCallback((force = false) => {
+    if (inflight.current.has('dashboard')) return
+    if (!force && dashLoaded.current) return
+    inflight.current.add('dashboard')
+    setState((s) => ({ ...s, dashboardLoading: true }))
+    void (async () => {
+      try {
+        const d = await api.dashboard()
+        dashLoaded.current = true
+        setState((s) => ({ ...s, dashboard: d, dashboardLoaded: true, dashboardLoading: false }))
+      } catch (e) {
+        setState((s) => ({ ...s, dashboardLoading: false }))
+        fail(e)
+      } finally {
+        inflight.current.delete('dashboard')
+      }
+    })()
+  }, [fail])
+
+  const loadOrderDetail = useCallback((id: number) => {
+    setState((s) => ({ ...s, selectedOrderLoading: true }))
+    void (async () => {
+      try {
+        const d = await api.order(id)
+        setState((s) => ({ ...s, selectedOrder: d, selectedOrderLoading: false }))
+      } catch (e) {
+        setState((s) => ({ ...s, selectedOrderLoading: false }))
+        fail(e)
+      }
+    })()
+  }, [fail])
+
+  const loadCustomerOrders = useCallback((customerId: number, page = 1) => {
+    setState((s) => ({ ...s, customerOrders: { ...s.customerOrders, loading: true } }))
+    void (async () => {
+      try {
+        const res = await api.customerOrders(customerId, { page, limit: 10 })
+        setState((s) => ({ ...s, customerOrders: { rows: res.rows, total: res.total, page: res.page, limit: res.limit, totalPages: res.totalPages, loaded: true, loading: false } }))
+      } catch (e) {
+        setState((s) => ({ ...s, customerOrders: { ...s.customerOrders, loading: false } }))
+        fail(e)
+      }
+    })()
+  }, [fail])
+
+  const loadPreorderOrders = useCallback((preorderId: number, page = 1) => {
+    setState((s) => ({ ...s, preorderOrders: { ...s.preorderOrders, loading: true } }))
+    void (async () => {
+      try {
+        const res = await api.preorderOrders(preorderId, { page, limit: 20 })
+        setState((s) => ({ ...s, preorderOrders: { rows: res.rows, total: res.total, page: res.page, limit: res.limit, totalPages: res.totalPages, loaded: true, loading: false } }))
+      } catch (e) {
+        setState((s) => ({ ...s, preorderOrders: { ...s.preorderOrders, loading: false } }))
+        fail(e)
+      }
+    })()
+  }, [fail])
+
+  const ensureScreen = useCallback(() => {
+    const sc = stateRef.current.screen
+    if (sc === 'dashboard') loadDashboard()
+    else SCREEN_LISTS[sc].forEach((k) => loadList(k))
+  }, [loadDashboard, loadList])
+
+  // Validasi token tersimpan dengan satu call /me.
+  const validateSession = useCallback(async () => {
+    try {
+      const me = await api.me()
+      setState((s) => ({ ...s, authed: true, booting: false, currentUser: { username: me.username, name: me.fullName, super: me.isSuper } }))
+    } catch {
+      clearToken()
+      setState((s) => ({ ...s, authed: false, booting: false }))
+    }
+  }, [])
+
+  useEffect(() => { if (getToken()) void validateSession() }, [validateSession])
+
+  // Simpan preferensi dark/light ke localStorage.
+  useEffect(() => { localStorage.setItem('deedims_dark', state.dark ? '1' : '0') }, [state.dark])
+
+  // Muat data layar aktif saat authed / pindah layar.
+  useEffect(() => {
+    if (state.authed) ensureScreen()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.authed, state.screen])
+
+  // Fetch detail order saat dipilih.
+  useEffect(() => {
+    if (state.selectedOrderId != null) loadOrderDetail(state.selectedOrderId)
+    else setState((s) => ({ ...s, selectedOrder: null }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.selectedOrderId])
+
+  // Fetch track-record order saat customer dipilih.
+  useEffect(() => {
+    if (state.selectedCustomerU) {
+      const row = state.lists.customers.rows.find((c: CustomerRow) => c.username === state.selectedCustomerU)
+      if (row) loadCustomerOrders(row.id)
+    } else {
+      setState((s) => ({ ...s, customerOrders: emptyList() }))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.selectedCustomerU])
+
+  // Fetch order PO saat pre-order dipilih (drill-down detail).
+  useEffect(() => {
+    if (state.selectedPreorderId != null) loadPreorderOrders(state.selectedPreorderId)
+    else setState((s) => ({ ...s, preorderOrders: emptyList() }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.selectedPreorderId])
+
+  const patchOrder = useCallback((id: number, patch: Partial<OrderDetail>) => {
+    // Optimistic: detail + baris list + recent orders dashboard.
+    setState((s) => ({
+      ...s,
+      selectedOrder: s.selectedOrder && s.selectedOrder.id === id ? { ...s.selectedOrder, ...patch } : s.selectedOrder,
+      lists: { ...s.lists, orders: { ...s.lists.orders, rows: s.lists.orders.rows.map((o: OrderRow) => (o.id === id ? { ...o, ...patch } : o)) } },
+      dashboard: s.dashboard && 'status' in patch ? { ...s.dashboard, recentOrders: s.dashboard.recentOrders.map((o) => (o.id === id ? { ...o, status: patch.status! } : o)) } : s.dashboard,
+    }))
+
+    void (async () => {
+      try {
+        if (patch.cancelRequested === false) {
+          if (patch.status === 'cancelled') await api.approveCancel(id)
+          else await api.rejectCancel(id)
+          const fresh = await api.order(id)
+          setState((s) => ({
+            ...s,
+            selectedOrder: fresh,
+            lists: { ...s.lists, orders: { ...s.lists.orders, rows: s.lists.orders.rows.map((o: OrderRow) => (o.id === id ? { ...o, status: fresh.status, pay: fresh.pay, cancelRequested: fresh.cancelRequested } : o)) } },
+          }))
+          return
+        }
+
+        const body: Record<string, unknown> = {}
+        if ('status' in patch && patch.status) body.orderStatus = patch.status
+        if ('pay' in patch && patch.pay) body.paymentStatus = patch.pay
+        if ('adminNotes' in patch) body.adminNotes = patch.adminNotes ?? ''
+        if (Object.keys(body).length === 0) return
+
+        const onlyNotes = Object.keys(body).length === 1 && 'adminNotes' in body
+        if (onlyNotes) {
+          debounceSave(`order-notes-${id}`, () => void api.patchOrder(id, body).catch(fail))
+          return
+        }
+
+        const u = await api.patchOrder(id, body)
+        setState((s) => ({
+          ...s,
+          selectedOrder: s.selectedOrder && s.selectedOrder.id === id ? { ...s.selectedOrder, status: u.status, pay: u.pay, adminNotes: u.adminNotes ?? '', cancelRequested: u.cancelRequested, updatedAt: fmtDateTime(u.updatedAt) } : s.selectedOrder,
+          lists: { ...s.lists, orders: { ...s.lists.orders, rows: s.lists.orders.rows.map((o: OrderRow) => (o.id === id ? { ...o, status: u.status, pay: u.pay, cancelRequested: u.cancelRequested } : o)) } },
+          dashboard: s.dashboard ? { ...s.dashboard, recentOrders: s.dashboard.recentOrders.map((o) => (o.id === id ? { ...o, status: u.status } : o)) } : s.dashboard,
+        }))
+      } catch (e) {
+        fail(e)
+      }
+    })()
+  }, [debounceSave, fail])
+
+  const updatePreorderRow = (id: number, patch: Partial<PreorderRow>) =>
+    update((s) => ({ lists: { ...s.lists, preorders: { ...s.lists.preorders, rows: s.lists.preorders.rows.map((p: PreorderRow) => (p.id === id ? { ...p, ...patch } : p)) } } }))
+
+  const store = useMemo<AdminStore>(() => {
+    const currentLists = state.screen === 'dashboard' ? [] : SCREEN_LISTS[state.screen]
+    return {
+      ...state,
+      set,
+      showToast,
+      ensureScreen,
+      refresh: () => {
+        if (state.screen === 'dashboard') loadDashboard(true)
+        else currentLists.forEach((k) => loadList(k, { force: true }))
+      },
+      isScreenReady: () => (state.screen === 'dashboard' ? state.dashboardLoaded : currentLists.every((k) => state.lists[k].loaded)),
+      isScreenLoading: () => (state.screen === 'dashboard' ? state.dashboardLoading : currentLists.some((k) => state.lists[k].loading)),
+      setListPage: (key, page) => loadList(key, { page, force: true }),
+      setOrderFilter: (status) => {
+        setState((s) => ({ ...s, orderFilter: status }))
+        loadList('orders', { page: 1, status, force: true })
+      },
+      patchOrder,
+
+      doLogin: () => {
+        const un = (state.loginUser || '').trim().toLowerCase()
+        void (async () => {
+          try {
+            const { token, user } = await api.login(un, state.loginPass)
+            setToken(token)
+            setState((s) => ({ ...s, authed: true, booting: false, loginPass: '', currentUser: { username: user.username, name: user.fullName, super: user.isSuper }, screen: 'dashboard', selectedOrderId: null, selectedCustomerU: null }))
+            showToast('Selamat datang, ' + user.fullName.split(' ')[0])
+          } catch (e) {
+            showToast(e instanceof ApiError ? e.message : 'Login gagal')
+          }
+        })()
+      },
+      doLogout: () => {
+        clearToken()
+        listLoaded.current.clear()
+        inflight.current.clear()
+        dashLoaded.current = false
+        setState((s) => ({ ...s, ...initialState, booting: false, dark: s.dark }))
+      },
+
+      goScreen: (screen) => set({ screen, selectedOrderId: null, selectedCustomerU: null, selectedPreorderId: null }),
+      selectOrder: (id) => set({ screen: 'orders', selectedOrderId: id, selectedCustomerU: null }),
+      selectPreorder: (id) => set({ selectedPreorderId: id }),
+      setPreorderOrdersPage: (page) => { if (state.selectedPreorderId != null) loadPreorderOrders(state.selectedPreorderId, page) },
+
+      openPreorder: (id) => {
+        if (state.lists.preorders.rows.some((x: PreorderRow) => x.status === 'open')) {
+          showToast('Tutup dulu PO yang sedang open — hanya boleh satu open')
+          return
+        }
+        void (async () => {
+          try {
+            const po = await api.openPreorder(id)
+            updatePreorderRow(id, { status: po.status as PreorderRow['status'] })
+            showToast('PO dibuka — reminder terkirim ke subscriber aktif')
+          } catch (e) { fail(e) }
+        })()
+      },
+      closePreorder: (id) => {
+        void (async () => {
+          try {
+            const po = await api.closePreorder(id)
+            updatePreorderRow(id, { status: po.status as PreorderRow['status'] })
+            showToast('PO ditutup — customer tidak bisa order baru')
+          } catch (e) { fail(e) }
+        })()
+      },
+      completePreorder: (id) => {
+        void (async () => {
+          try {
+            const po = await api.completePreorder(id)
+            updatePreorderRow(id, { status: po.status as PreorderRow['status'] })
+            showToast('PO ditandai selesai')
+          } catch (e) { fail(e) }
+        })()
+      },
+      createPo: () => {
+        if (!state.poTitle.trim()) { showToast('Judul batch wajib diisi'); return }
+        void (async () => {
+          try {
+            const po = await api.createPreorder({
+              title: state.poTitle, description: state.poDesc || null,
+              fulfillmentDate: state.poDate ? new Date(state.poDate + 'T00:00:00').toISOString() : null,
+              fulfillmentNote: state.poNote || null,
+            })
+            update((s) => ({ lists: { ...s.lists, preorders: { ...s.lists.preorders, rows: [mapPreorderRow(po), ...s.lists.preorders.rows] } }, showPoForm: false, poTitle: '', poDesc: '', poDate: '', poNote: '' }))
+            showToast('Draft batch dibuat — buka saat siap terima order')
+          } catch (e) { fail(e) }
+        })()
+      },
+
+      toggleBlockCustomer: (username) => {
+        const c = state.lists.customers.rows.find((x: CustomerRow) => x.username === username) as CustomerRow | undefined
+        if (!c) return
+        const next = !c.blocked
+        void (async () => {
+          try {
+            const u = await api.blockCustomer(c.id, next)
+            update((s) => ({ lists: { ...s.lists, customers: { ...s.lists.customers, rows: s.lists.customers.rows.map((x: CustomerRow) => (x.username === username ? { ...x, blocked: u.blocked } : x)) } } }))
+            showToast(next ? '@' + username + ' diblokir' : '@' + username + ' dibuka blokirnya')
+          } catch (e) { fail(e) }
+        })()
+      },
+
+      toggleMenuActive: (id) => {
+        const m = state.lists.menus.rows.find((x: Menu) => x.id === id) as Menu | undefined
+        void (async () => {
+          try {
+            const r = await api.toggleMenu(id)
+            update((s) => ({ lists: { ...s.lists, menus: { ...s.lists.menus, rows: s.lists.menus.rows.map((x: Menu) => (x.id === id ? { ...x, active: r.isActive } : x)) } } }))
+            if (m) showToast(m.name + (r.isActive ? ' diaktifkan' : ' dinonaktifkan'))
+          } catch (e) { fail(e) }
+        })()
+      },
+      openMenuEditor: (menu) => {
+        if (menu) {
+          set({ editMenuId: menu.id, menuDraft: JSON.parse(JSON.stringify(menu)) })
+        } else {
+          const firstStock = state.lists.stock.rows[0] ? (state.lists.stock.rows[0] as StockItem).id : 1
+          set({ editMenuId: 'new', menuDraft: { name: '', description: '', basePrice: 0, active: true, isAddon: false, image: '', variants: [{ name: '(default)', price: 0, stockId: firstStock, qty: 1 }], addons: [] } })
+        }
+      },
+      closeMenuEditor: () => set({ editMenuId: null, menuDraft: null }),
+      updateDraft: (patch) => update((s) => (s.menuDraft ? { menuDraft: { ...s.menuDraft, ...patch } } : {})),
+      updateVariant: (i, patch) => update((s) => (s.menuDraft ? { menuDraft: { ...s.menuDraft, variants: s.menuDraft.variants.map((v, j) => (j === i ? { ...v, ...patch } : v)) } } : {})),
+      addVariant: () => {
+        const fs = state.lists.stock.rows[0] ? (state.lists.stock.rows[0] as StockItem).id : 1
+        update((s) => (s.menuDraft ? { menuDraft: { ...s.menuDraft, variants: [...s.menuDraft.variants, { name: '', price: 0, stockId: fs, qty: 1 }] } } : {}))
+      },
+      removeVariant: (i) => update((s) => (s.menuDraft ? { menuDraft: { ...s.menuDraft, variants: s.menuDraft.variants.filter((_, j) => j !== i) } } : {})),
+      toggleAddon: (id) => update((s) => {
+        if (!s.menuDraft) return {}
+        const has = s.menuDraft.addons.includes(id)
+        return { menuDraft: { ...s.menuDraft, addons: has ? s.menuDraft.addons.filter((a) => a !== id) : [...s.menuDraft.addons, id] } }
+      }),
+      setDraftImageFromFile: (file) => {
+        void (async () => {
+          try {
+            const url = await uploadImage(file)
+            update((s) => (s.menuDraft ? { menuDraft: { ...s.menuDraft, image: url } } : {}))
+            showToast('Foto terupload')
+          } catch (e) { fail(e) }
+        })()
+      },
+      saveMenu: () => {
+        const d = state.menuDraft
+        if (!d) return
+        if (!d.name.trim()) { showToast('Nama menu wajib diisi'); return }
+        const body = menuToApi(d)
+        void (async () => {
+          try {
+            if (state.editMenuId === 'new') {
+              const m = await api.createMenu(body)
+              update((s) => ({ lists: { ...s.lists, menus: { ...s.lists.menus, rows: [mapMenu(m), ...s.lists.menus.rows] } }, editMenuId: null, menuDraft: null }))
+              showToast('Menu baru dibuat')
+            } else {
+              const id = state.editMenuId as number
+              const m = await api.updateMenu(id, body)
+              update((s) => ({ lists: { ...s.lists, menus: { ...s.lists.menus, rows: s.lists.menus.rows.map((x: Menu) => (x.id === id ? mapMenu(m) : x)) } }, editMenuId: null, menuDraft: null }))
+              showToast('Menu diperbarui')
+            }
+          } catch (e) { fail(e) }
+        })()
+      },
+
+      adjustStock: (id, delta) => {
+        update((s) => ({ lists: { ...s.lists, stock: { ...s.lists.stock, rows: s.lists.stock.rows.map((x: StockItem) => (x.id === id ? { ...x, quantity: Math.max(0, x.quantity + delta) } : x)) } } }))
+        void (async () => {
+          try {
+            const r = await api.adjustStock(id, delta)
+            update((s) => ({ lists: { ...s.lists, stock: { ...s.lists.stock, rows: s.lists.stock.rows.map((x: StockItem) => (x.id === id ? mapStock(r) : x)) } } }))
+          } catch (e) { fail(e); loadList('stock', { force: true }) }
+        })()
+      },
+      createStock: () => {
+        if (!state.sName.trim()) { showToast('Nama stock wajib diisi'); return }
+        const label = state.sLabel.trim() || state.sName.trim().toLowerCase().replace(/\s+/g, '-')
+        if (state.lists.stock.rows.some((x: StockItem) => x.label === label)) { showToast('Label "' + label + '" sudah dipakai — harus unik'); return }
+        void (async () => {
+          try {
+            const r = await api.createStock({ label, name: state.sName, quantity: parseInt(state.sQty, 10) || 0, unit: state.sUnit || 'pcs' })
+            update((s) => ({ lists: { ...s.lists, stock: { ...s.lists.stock, rows: [...s.lists.stock.rows, mapStock(r)] } }, showStockForm: false, sName: '', sLabel: '', sQty: '', sUnit: '' }))
+            showToast('Stock item dibuat')
+          } catch (e) { fail(e) }
+        })()
+      },
+
+      createUser: () => {
+        const un = state.uName.trim().toLowerCase().replace(/\s+/g, '')
+        if (!un) { showToast('Username wajib diisi'); return }
+        if (!state.uPass.trim()) { showToast('Password wajib diisi'); return }
+        if (state.lists.users.rows.some((u: User) => u.username === un)) { showToast('Username "' + un + '" sudah dipakai'); return }
+        void (async () => {
+          try {
+            const r = await api.createUser({ username: un, fullName: state.uFull.trim() || un, password: state.uPass })
+            update((s) => ({ lists: { ...s.lists, users: { ...s.lists.users, rows: [...s.lists.users.rows, mapUser(r)] } }, showUserForm: false, uName: '', uFull: '', uPass: '' }))
+            showToast('Admin @' + un + ' ditambahkan')
+          } catch (e) { fail(e) }
+        })()
+      },
+      openUserEditor: (u) => set({ editUserU: u.username, userDraft: { name: u.name, username: u.username, password: '', super: u.super } }),
+      closeUserEditor: () => set({ editUserU: null, userDraft: null }),
+      updateUserDraft: (patch) => update((s) => (s.userDraft ? { userDraft: { ...s.userDraft, ...patch } } : {})),
+      saveUser: () => {
+        const d = state.userDraft
+        if (!d) return
+        const un = (d.username || '').trim().toLowerCase().replace(/\s+/g, '')
+        if (!un) { showToast('Username wajib diisi'); return }
+        if (state.lists.users.rows.some((u: User) => u.username === un && u.username !== state.editUserU)) { showToast('Username "' + un + '" sudah dipakai'); return }
+        const target = state.lists.users.rows.find((u: User) => u.username === state.editUserU) as User | undefined
+        if (!target || target.id == null) return
+        const body: Record<string, unknown> = { username: un, fullName: (d.name || '').trim() || un }
+        if ((d.password || '').trim()) body.password = d.password
+        void (async () => {
+          try {
+            const r = await api.updateUser(target.id!, body)
+            update((s) => ({ lists: { ...s.lists, users: { ...s.lists.users, rows: s.lists.users.rows.map((u: User) => (u.username === state.editUserU ? mapUser(r) : u)) } }, editUserU: null, userDraft: null }))
+            showToast('Admin @' + un + ' diperbarui')
+          } catch (e) { fail(e) }
+        })()
+      },
+      deleteUser: (username) => {
+        const u = state.lists.users.rows.find((x: User) => x.username === username) as User | undefined
+        if (!u || u.super) { showToast('Super User tidak bisa dihapus'); return }
+        if (u.id == null) return
+        void (async () => {
+          try {
+            await api.deleteUser(u.id!)
+            update((s) => ({ lists: { ...s.lists, users: { ...s.lists.users, rows: s.lists.users.rows.filter((x: User) => x.username !== username) } } }))
+            showToast('Admin @' + username + ' dihapus')
+          } catch (e) { fail(e) }
+        })()
+      },
+
+      updateSetting: (index, value) => {
+        update((s) => ({ lists: { ...s.lists, settings: { ...s.lists.settings, rows: s.lists.settings.rows.map((x: Setting, j: number) => (j === index ? { ...x, value } : x)) } } }))
+        const setting = state.lists.settings.rows[index] as Setting | undefined
+        if (!setting || setting.id == null) return
+        debounceSave(`setting-${setting.id}`, () => void api.updateSetting(setting.id!, value).catch(fail))
+      },
+
+      openImage: (img) => { if (img) set({ lightboxImage: img }); else showToast('Belum ada foto — buka Edit untuk menambah') },
+      closeLightbox: () => set({ lightboxImage: null }),
+    }
+  }, [state, set, update, showToast, ensureScreen, loadDashboard, loadList, loadPreorderOrders, patchOrder, debounceSave, fail])
+
+  return <AdminContext.Provider value={store}>{children}</AdminContext.Provider>
+}
+
+export function useAdmin(): AdminStore {
+  const ctx = useContext(AdminContext)
+  if (!ctx) throw new Error('useAdmin must be used within AdminProvider')
+  return ctx
+}
