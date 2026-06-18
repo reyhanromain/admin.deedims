@@ -29,6 +29,8 @@ describe('menus', () => {
     expect(data(res).variants[0]).toEqual({ name: 'V', price: 9000, stockId: 1, qty: 1 })
     expect(data(res).addons).toEqual([2])
     expect(data(res).freeAddons).toEqual([2])
+    const links = await prisma.menuAddon.findMany({ where: { menuId: data(res).id, addonMenuId: 2 }, orderBy: { isFree: 'asc' } })
+    expect(links.map((x) => x.isFree)).toEqual([false, true])
   })
 
   it('ganti imageUrl me-reset telegramFileId (aturan hybrid)', async () => {
@@ -61,15 +63,15 @@ describe('menus', () => {
     expect(m.addonLinks).toHaveLength(0)
   })
 
-  it('patch menyimpan freeAddons sebagai relasi add-on gratis', async () => {
+  it('patch bisa menyimpan menu yang sama sebagai free dan add-on berbayar', async () => {
     const res = await app.inject({
       method: 'PATCH', url: '/api/menus/1', headers: authH(token),
-      payload: { name: 'Menu A', basePrice: 10000, variants: [{ name: 'Reg', price: 10000, stockId: 1, qty: 2 }], addons: [], freeAddons: [2] },
+      payload: { name: 'Menu A', basePrice: 10000, variants: [{ name: 'Reg', price: 10000, stockId: 1, qty: 2 }], addons: [2], freeAddons: [2] },
     })
     expect(data(res).addons).toEqual([2])
     expect(data(res).freeAddons).toEqual([2])
-    const link = await prisma.menuAddon.findFirstOrThrow({ where: { menuId: 1, addonMenuId: 2 } })
-    expect(link.isFree).toBe(true)
+    const links = await prisma.menuAddon.findMany({ where: { menuId: 1, addonMenuId: 2 }, orderBy: { isFree: 'asc' } })
+    expect(links.map((x) => x.isFree)).toEqual([false, true])
   })
 
   it('toggle → data {id,isActive}', async () => {

@@ -158,12 +158,13 @@ export function MenuEditorModal() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
                   {addonChoices.map((ac) => {
                     const free = d.freeAddons.includes(ac.id)
-                    const paid = d.addons.includes(ac.id) && !free
+                    const paid = d.addons.includes(ac.id)
+                    const status = free && paid ? 'Free 1x + add-on berbayar' : free ? 'Free menu' : paid ? 'Add-on berbayar' : fmt(ac.basePrice)
                     return (
                       <div key={ac.id} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr auto', gap: 10, alignItems: 'center', padding: '10px 12px', border: `1px solid ${free || paid ? t.chipColor : t.inputBorder}`, background: free || paid ? t.chipBg : t.surface, borderRadius: 10 }}>
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontSize: 13, fontWeight: 700, overflowWrap: 'anywhere' }}>{ac.name}</div>
-                          <div style={{ fontSize: 12.5, color: t.muted, fontWeight: 700, marginTop: 2 }}>{free ? 'Free menu' : paid ? 'Add-on berbayar' : fmt(ac.basePrice)}</div>
+                          <div style={{ fontSize: 12.5, color: t.muted, fontWeight: 700, marginTop: 2 }}>{status}</div>
                         </div>
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: isMobile ? 'flex-start' : 'flex-end' }}>
                           <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, border: `1px solid ${paid ? BRAND.terracotta : t.inputBorder}`, background: paid ? BRAND.terracotta : t.surface, color: paid ? '#fff' : t.ink, borderRadius: 8, padding: '7px 10px', cursor: 'pointer' }}>

@@ -50,7 +50,7 @@ const starterMenus: StarterMenu[] = [
       { name: 'Mini Party', price: 70000, stock: [{ label: 'dimsum', quantity: 12 }] },
       { name: 'Full Party', price: 85000, stock: [{ label: 'dimsum', quantity: 16 }] },
     ],
-    addons: [],
+    addons: ['chili-oil'],
     freeAddons: ['chili-oil'],
   },
   {
@@ -200,13 +200,24 @@ async function seedCatalog() {
 
   for (const menu of starterMenus) {
     const menuId = menuByKey.get(menu.key)!
-    const addonKeys = Array.from(new Set([...menu.addons, ...menu.freeAddons]))
-    for (const addonKey of addonKeys) {
+    for (const addonKey of Array.from(new Set(menu.addons))) {
       await prisma.menuAddon.create({
         data: {
           menuId,
           addonMenuId: menuByKey.get(addonKey)!,
-          isFree: menu.freeAddons.includes(addonKey),
+          isFree: false,
+          isRequired: false,
+          maxQuantity: 1,
+          sortOrder: 0,
+        },
+      })
+    }
+    for (const addonKey of Array.from(new Set(menu.freeAddons))) {
+      await prisma.menuAddon.create({
+        data: {
+          menuId,
+          addonMenuId: menuByKey.get(addonKey)!,
+          isFree: true,
           isRequired: false,
           maxQuantity: 1,
           sortOrder: 0,

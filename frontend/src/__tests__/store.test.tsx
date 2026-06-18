@@ -151,7 +151,7 @@ describe('menus', () => {
     await waitFor(() => expect((r.current.lists.menus.rows as any[]).some((m) => m.id === 9)).toBe(true))
   })
 
-  it('toggleFreeAddon membuat add-on gratis dan masuk body saveMenu', async () => {
+  it('toggleFreeAddon bisa berdampingan dengan add-on berbayar', async () => {
     api.updateMenu.mockResolvedValue({ id: 1, name: 'Menu A', description: '', basePrice: 10000, isActive: true, isAddon: false, imageUrl: '', variants: [{ name: 'Reg', price: 10000, stockId: 1, qty: 2 }], addons: [2], freeAddons: [2] })
     const r = await mountAuthed()
     await goto(r, 'menus')

@@ -14,7 +14,7 @@ const menuWithRelations = {
 
 type MenuRow = Prisma.MenuGetPayload<{ include: typeof menuWithRelations }>
 
-/** DTO menu untuk editor FE: variant = {name,price,stockId,qty}, addons = number[]. */
+/** DTO menu untuk editor FE: addons = berbayar; freeAddons = gratis otomatis. */
 function shapeMenu(m: MenuRow) {
   return {
     id: m.id,
@@ -30,7 +30,7 @@ function shapeMenu(m: MenuRow) {
       stockId: v.stockUsages[0]?.stockItemId ?? null,
       qty: v.stockUsages[0]?.quantity ?? null,
     })),
-    addons: m.addonLinks.map((a) => a.addonMenuId),
+    addons: Array.from(new Set(m.addonLinks.filter((a) => !a.isFree).map((a) => a.addonMenuId))),
     freeAddons: m.addonLinks.filter((a) => a.isFree).map((a) => a.addonMenuId),
   }
 }
@@ -69,10 +69,11 @@ async function writeChildren(tx: Prisma.TransactionClient, menuId: number, data:
     })
   }
   if (!data.isAddon) {
-    const addonIds = Array.from(new Set([...data.addons, ...data.freeAddons]))
-    const freeIds = new Set(data.freeAddons)
-    for (const addonMenuId of addonIds) {
-      await tx.menuAddon.create({ data: { menuId, addonMenuId, isFree: freeIds.has(addonMenuId) } })
+    for (const addonMenuId of Array.from(new Set(data.addons))) {
+      await tx.menuAddon.create({ data: { menuId, addonMenuId, isFree: false } })
+    }
+    for (const addonMenuId of Array.from(new Set(data.freeAddons))) {
+      await tx.menuAddon.create({ data: { menuId, addonMenuId, isFree: true } })
     }
   }
 }
