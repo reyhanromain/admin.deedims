@@ -87,6 +87,30 @@ export interface Subscriber {
   active: boolean
 }
 
+export type BotMessageDirection = 'incoming' | 'outgoing'
+
+export interface BotMessage {
+  id: number
+  direction: BotMessageDirection
+  messageType: string
+  text: string
+  telegramUsername: string
+  customerName: string
+  isCommand: boolean
+  command: string
+  customerId: number | null
+  receivedAt: string
+  telegramUserId: string | null
+  telegramChatId: string
+}
+
+export interface BotMessageCustomer {
+  id: number
+  username: string
+  name: string
+  messageCount: number
+}
+
 export interface Setting {
   id?: number
   label: string
@@ -174,6 +198,7 @@ export type Screen =
   | 'menus'
   | 'stock'
   | 'subscribers'
+  | 'botMessages'
   | 'users'
   | 'settings'
 

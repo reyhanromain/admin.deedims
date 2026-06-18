@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from 'react'
+import type { UIEvent } from 'react'
 import { useAdmin } from './store'
 import { getTheme } from './theme'
 import { Login } from './components/Login'
@@ -14,8 +16,10 @@ import { Customers } from './screens/Customers'
 import { Menus } from './screens/Menus'
 import { Stock } from './screens/Stock'
 import { Subscribers } from './screens/Subscribers'
+import { BotMessages } from './screens/BotMessages'
 import { Users } from './screens/Users'
 import { Settings } from './screens/Settings'
+import { useIsMobile } from './responsive'
 
 const SCREENS = {
   dashboard: Dashboard,
@@ -25,6 +29,7 @@ const SCREENS = {
   menus: Menus,
   stock: Stock,
   subscribers: Subscribers,
+  botMessages: BotMessages,
   users: Users,
   settings: Settings,
 }
@@ -32,13 +37,31 @@ const SCREENS = {
 export function App() {
   const s = useAdmin()
   const t = getTheme(s.dark)
+  const isMobile = useIsMobile()
+  const contentRef = useRef<HTMLDivElement>(null)
+  const [headerHidden, setHeaderHidden] = useState(false)
+
+  useEffect(() => {
+    setHeaderHidden(false)
+    contentRef.current?.scrollTo({ top: 0 })
+  }, [s.screen])
+
+  useEffect(() => {
+    if (!isMobile) setHeaderHidden(false)
+  }, [isMobile])
+
+  const handleContentScroll = (event: UIEvent<HTMLDivElement>) => {
+    if (!isMobile) return
+    const nextHidden = event.currentTarget.scrollTop > 8
+    setHeaderHidden((current) => current === nextHidden ? current : nextHidden)
+  }
 
   const root = {
     fontFamily: "'Plus Jakarta Sans', sans-serif",
     color: t.ink,
     background: t.bg,
     colorScheme: t.scheme,
-    height: '100vh',
+    height: '100dvh',
     overflow: 'hidden',
   } as const
 
@@ -64,11 +87,19 @@ export function App() {
 
   return (
     <div style={root}>
-      <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
         <Sidebar />
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          <Header />
-          <div style={{ flex: 1, overflow: 'auto', padding: '26px 28px' }}>
+          <Header mobileHidden={headerHidden} />
+          <div
+            ref={contentRef}
+            onScroll={handleContentScroll}
+            style={{
+              flex: 1,
+              overflow: 'auto',
+              padding: isMobile ? '14px 14px calc(92px + env(safe-area-inset-bottom))' : '26px 28px',
+            }}
+          >
             {ready ? (
               <ScreenComponent />
             ) : (

@@ -13,7 +13,7 @@ vi.mock('../api', async (orig) => {
     api: {
       login: fn(), me: fn(), dashboard: fn(), order: fn(),
       ordersList: fn(), customersList: fn(), customerOrders: fn(), preorderOrders: fn(), subscribersList: fn(), preordersList: fn(),
-      menusList: fn(), stockList: fn(), usersList: fn(), settingsList: fn(),
+      botMessagesList: fn(), botMessageCustomers: fn(), menusList: fn(), stockList: fn(), usersList: fn(), settingsList: fn(),
       adjustStock: fn(), createStock: fn(), createMenu: fn(), updateMenu: fn(), toggleMenu: fn(),
       createPreorder: fn(), openPreorder: fn(), closePreorder: fn(), completePreorder: fn(),
       patchOrder: fn(), approveCancel: fn(), rejectCancel: fn(), blockCustomer: fn(),
@@ -50,6 +50,8 @@ beforeEach(() => {
   api.customersList.mockResolvedValue(paged([custRow]))
   api.customerOrders.mockResolvedValue(paged([{ id: 1, code: 'DD-1', createdAt: '12 Jun, 09:13', itemsSummary: 'Menu A x1', total: 10000, status: 'confirmed' }]))
   api.subscribersList.mockResolvedValue(paged([{ username: 'sari', name: 'sari', since: '02 May 2026', active: true }], { counts: { active: 1, inactive: 0 } }))
+  api.botMessagesList.mockResolvedValue(paged([{ id: 1, direction: 'incoming', messageType: 'text', text: 'hai', telegramUsername: 'sari', customerName: 'Sari', isCommand: false, command: '', customerId: 1, receivedAt: '12 Jun 2026, 09:13', telegramUserId: '9001', telegramChatId: '9001' }]))
+  api.botMessageCustomers.mockResolvedValue([{ id: 1, username: 'sari', name: 'Sari', messageCount: 1 }])
   api.preordersList.mockResolvedValue(paged([poOpen, poDraft]))
   api.preorderOrders.mockResolvedValue(paged([orderRow]))
   api.menusList.mockResolvedValue(paged([menuRow]))
@@ -105,6 +107,25 @@ describe('lazy per-layar', () => {
     await goto(r, 'orders')
     act(() => r.current.setListPage('orders', 2))
     await waitFor(() => expect(api.ordersList).toHaveBeenCalledWith(expect.objectContaining({ page: 2 })))
+  })
+
+  it('buka Bot Messages → load pesan + customer yang punya chat untuk filter', async () => {
+    const r = await mountAuthed()
+    await goto(r, 'botMessages')
+    expect(api.botMessagesList).toHaveBeenCalledTimes(1)
+    expect(api.botMessageCustomers).toHaveBeenCalledTimes(1)
+    expect(api.customersList).not.toHaveBeenCalled()
+    expect(r.current.lists.botMessages.rows).toHaveLength(1)
+    expect(r.current.botMessageCustomers).toEqual([{ id: 1, username: 'sari', name: 'Sari', messageCount: 1 }])
+  })
+
+  it('filter Bot Messages memicu refetch server-side', async () => {
+    const r = await mountAuthed()
+    await goto(r, 'botMessages')
+    act(() => r.current.setBotMessageDirection('incoming'))
+    await waitFor(() => expect(api.botMessagesList).toHaveBeenCalledWith(expect.objectContaining({ direction: 'incoming', page: 1 })))
+    act(() => r.current.setBotMessageCustomerId(1))
+    await waitFor(() => expect(api.botMessagesList).toHaveBeenCalledWith(expect.objectContaining({ customerId: 1, page: 1 })))
   })
 })
 

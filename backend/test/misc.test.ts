@@ -72,4 +72,11 @@ describe('bot-messages', () => {
     expect(data(res)[0].receivedAtLabel).toBe('12 Jun 2026, 09:13')
     expect(meta(res)).toMatchObject({ total: 1 })
   })
+
+  it('list customers with messages only', async () => {
+    await prisma.customer.create({ data: { id: 2, telegramUserId: 222n, username: 'budi', name: 'Budi' } })
+    await prisma.botMessage.create({ data: { telegramChatId: 1n, customerId: 1, direction: 'incoming', messageType: 'text', text: 'hai', receivedAt: new Date('2026-06-12T02:13:00Z') } })
+    const res = await app.inject({ method: 'GET', url: '/api/bot-messages/customers', headers: authH(token) })
+    expect(data(res)).toEqual([{ id: 1, name: 'Sari', username: 'sari', messageCount: 1 }])
+  })
 })

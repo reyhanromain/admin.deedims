@@ -1,16 +1,18 @@
 import { useAdmin } from '../store'
 import { getTheme, BRAND, orderStatusBadge, payBadge } from '../theme'
 import { fmt } from '../format'
-import { cardStyle, inputStyle, tableHeadStyle } from '../styles'
+import { cardStyle, inputStyle, mobileMetaGrid, mobileStatStyle, tableHeadStyle } from '../styles'
 import { HoverButton, Hoverable, Icon, Pill } from '../ui'
 import { Pager } from '../components/Pager'
 import type { OrderRow, OrderStatus } from '../types'
+import { useIsMobile } from '../responsive'
 
 const GRID = '120px 1.4fr 1fr 100px 150px 120px'
 
 export function Orders() {
   const s = useAdmin()
   const t = getTheme(s.dark)
+  const isMobile = useIsMobile()
   const status = orderStatusBadge(s.dark)
   const pay = payBadge(s.dark)
 
@@ -48,47 +50,85 @@ export function Orders() {
         })}
       </div>
 
-      <div style={cardStyle(t, { overflowX: 'auto' })}>
-        <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 12, ...tableHeadStyle(t, 820) }}>
-          <div>Kode</div><div>Customer</div><div>Item</div>
-          <div style={{ textAlign: 'right' }}>Total</div><div>Status</div><div>Pembayaran</div>
+      {isMobile ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {rows.map((o) => {
+            const flagged = o.cancelRequested && o.status === 'confirmed'
+            return (
+              <Hoverable
+                key={o.id}
+                onClick={() => s.selectOrder(o.id)}
+                style={cardStyle(t, { padding: 14, cursor: 'pointer', background: flagged ? t.cancelRowBg : t.surface })}
+                hover={{ filter: 'brightness(0.98)' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 7 }}>
+                      {o.code}
+                      {o.cancelRequested && (
+                        <Icon size={14} stroke={BRAND.terracotta} strokeWidth={2.4} title="Cancel request" path="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z M4 22v-7" />
+                      )}
+                    </div>
+                    <div style={{ fontSize: 12.5, color: t.faint, marginTop: 2 }}>@{o.username} · {o.createdAt}</div>
+                  </div>
+                  <Pill bg={status[o.status].bg} color={status[o.status].color}>{status[o.status].label}</Pill>
+                </div>
+                <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 3 }}>{o.customer}</div>
+                <div style={{ fontSize: 12.5, color: t.muted, lineHeight: 1.45, marginBottom: 12 }}>{o.itemsSummary}</div>
+                <div style={mobileMetaGrid()}>
+                  <MobileMeta t={t} label="Total" value={fmt(o.total)} strong />
+                  <MobileMeta t={t} label="Pembayaran" value={pay[o.pay].label} color={pay[o.pay].color} strong />
+                </div>
+              </Hoverable>
+            )
+          })}
+          {rows.length === 0 && (
+            <div style={cardStyle(t, { padding: 24, textAlign: 'center', fontSize: 13.5, color: t.faint })}>Tidak ada order dengan status ini.</div>
+          )}
         </div>
-        {rows.map((o) => {
-          const flagged = o.cancelRequested && o.status === 'confirmed'
-          return (
-            <Hoverable
-              key={o.id}
-              onClick={() => s.selectOrder(o.id)}
-              style={{
-                display: 'grid', gridTemplateColumns: GRID, gap: 12, padding: '14px 20px',
-                borderBottom: `1px solid ${t.rowBorder}`, alignItems: 'center', cursor: 'pointer',
-                background: flagged ? t.cancelRowBg : t.surface, minWidth: 820,
-              }}
-              hover={{ filter: 'brightness(0.98)' }}
-            >
-              <div style={{ fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 7 }}>
-                {o.code}
-                {o.cancelRequested && (
-                  <Icon size={13} stroke={BRAND.terracotta} strokeWidth={2.4} title="Cancel request" path="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z M4 22v-7" />
-                )}
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 600 }}>{o.customer}</div>
-                <div style={{ fontSize: 12, color: t.faint }}>@{o.username} · {o.createdAt}</div>
-              </div>
-              <div style={{ fontSize: 12.5, color: t.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {o.itemsSummary}
-              </div>
-              <div style={{ fontSize: 13.5, fontWeight: 700, textAlign: 'right' }}>{fmt(o.total)}</div>
-              <div><Pill bg={status[o.status].bg} color={status[o.status].color}>{status[o.status].label}</Pill></div>
-              <div><span style={{ color: pay[o.pay].color, fontSize: 12, fontWeight: 700 }}>{pay[o.pay].label}</span></div>
-            </Hoverable>
-          )
-        })}
-        {rows.length === 0 && (
-          <div style={{ padding: 36, textAlign: 'center', fontSize: 13.5, color: t.faint }}>Tidak ada order dengan status ini.</div>
-        )}
-      </div>
+      ) : (
+        <div style={cardStyle(t, { overflowX: 'auto' })}>
+          <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 12, ...tableHeadStyle(t, 820) }}>
+            <div>Kode</div><div>Customer</div><div>Item</div>
+            <div style={{ textAlign: 'right' }}>Total</div><div>Status</div><div>Pembayaran</div>
+          </div>
+          {rows.map((o) => {
+            const flagged = o.cancelRequested && o.status === 'confirmed'
+            return (
+              <Hoverable
+                key={o.id}
+                onClick={() => s.selectOrder(o.id)}
+                style={{
+                  display: 'grid', gridTemplateColumns: GRID, gap: 12, padding: '14px 20px',
+                  borderBottom: `1px solid ${t.rowBorder}`, alignItems: 'center', cursor: 'pointer',
+                  background: flagged ? t.cancelRowBg : t.surface, minWidth: 820,
+                }}
+                hover={{ filter: 'brightness(0.98)' }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 7 }}>
+                  {o.code}
+                  {o.cancelRequested && (
+                    <Icon size={13} stroke={BRAND.terracotta} strokeWidth={2.4} title="Cancel request" path="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z M4 22v-7" />
+                  )}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 600 }}>{o.customer}</div>
+                  <div style={{ fontSize: 12, color: t.faint }}>@{o.username} · {o.createdAt}</div>
+                </div>
+                <div style={{ fontSize: 12.5, color: t.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {o.itemsSummary}
+                </div>
+                <div style={{ fontSize: 13.5, fontWeight: 700, textAlign: 'right' }}>{fmt(o.total)}</div>
+                <div><Pill bg={status[o.status].bg} color={status[o.status].color}>{status[o.status].label}</Pill></div>
+                <div><span style={{ color: pay[o.pay].color, fontSize: 12, fontWeight: 700 }}>{pay[o.pay].label}</span></div>
+              </Hoverable>
+            )
+          })}
+          {rows.length === 0 && (
+            <div style={{ padding: 36, textAlign: 'center', fontSize: 13.5, color: t.faint }}>Tidak ada order dengan status ini.</div>
+          )}
+        </div>
+      )}
 
       <Pager page={list.page} totalPages={list.totalPages} loading={list.loading} onPage={(p) => s.setListPage('orders', p)} />
     </section>
@@ -98,6 +138,7 @@ export function Orders() {
 function OrderDetail() {
   const s = useAdmin()
   const t = getTheme(s.dark)
+  const isMobile = useIsMobile()
   const status = orderStatusBadge(s.dark)
   const pay = payBadge(s.dark)
 
@@ -148,8 +189,8 @@ function OrderDetail() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1.6fr) minmax(260px, 1fr)', gap: 16, alignItems: 'start' }}>
-        <div style={cardStyle(t, { padding: '22px 24px' })}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(320px, 1.6fr) minmax(260px, 1fr)', gap: 16, alignItems: 'start' }}>
+        <div style={cardStyle(t, { padding: isMobile ? 16 : '22px 24px' })}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4, flexWrap: 'wrap' }}>
             <h2 style={{ margin: 0, fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 20, fontWeight: 700 }}>{sel.code}</h2>
             <Pill bg={status[sel.status].bg} color={status[sel.status].color} style={{ fontSize: 11.5, padding: '4px 12px' }}>{status[sel.status].label}</Pill>
@@ -158,7 +199,7 @@ function OrderDetail() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
             {sel.items.map((it, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 12, padding: '10px 14px', background: it.addon ? t.itemBgAddon : t.itemBg, borderRadius: 10, marginLeft: it.addon ? 26 : 0 }}>
+              <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 12, padding: '10px 14px', background: it.addon ? t.itemBgAddon : t.itemBg, borderRadius: 8, marginLeft: isMobile ? 0 : (it.addon ? 26 : 0), flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 600 }}>{it.name}</div>
                   <div style={{ fontSize: 12, color: t.muted }}>{it.meta || (it.addon ? 'Add-on' : 'Tanpa varian')}</div>
@@ -176,19 +217,19 @@ function OrderDetail() {
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
             {canConfirm && (
-              <HoverButton onClick={() => { s.patchOrder(sel.id, { status: 'confirmed' }); s.showToast('Order ' + sel.code + ' dikonfirmasi') }} style={btnGreen} hover={{ background: BRAND.bambooDark }}>Konfirmasi order</HoverButton>
+              <HoverButton onClick={() => { s.patchOrder(sel.id, { status: 'confirmed' }); s.showToast('Order ' + sel.code + ' dikonfirmasi') }} style={{ ...btnGreen, flex: isMobile ? '1 1 100%' : '0 0 auto' }} hover={{ background: BRAND.bambooDark }}>Konfirmasi order</HoverButton>
             )}
             {canReady && (
-              <HoverButton onClick={() => { s.patchOrder(sel.id, { status: 'ready' }); s.showToast('Order ' + sel.code + ' ditandai siap') }} style={btnRed} hover={{ background: BRAND.terracottaDark }}>Tandai siap</HoverButton>
+              <HoverButton onClick={() => { s.patchOrder(sel.id, { status: 'ready' }); s.showToast('Order ' + sel.code + ' ditandai siap') }} style={{ ...btnRed, flex: isMobile ? '1 1 100%' : '0 0 auto' }} hover={{ background: BRAND.terracottaDark }}>Tandai siap</HoverButton>
             )}
             {canComplete && (
-              <HoverButton onClick={() => { s.patchOrder(sel.id, { status: 'completed', pay: 'paid' }); s.showToast('Order ' + sel.code + ' selesai') }} style={btnGreen} hover={{ background: BRAND.bambooDark }}>Selesaikan order</HoverButton>
+              <HoverButton onClick={() => { s.patchOrder(sel.id, { status: 'completed', pay: 'paid' }); s.showToast('Order ' + sel.code + ' selesai') }} style={{ ...btnGreen, flex: isMobile ? '1 1 100%' : '0 0 auto' }} hover={{ background: BRAND.bambooDark }}>Selesaikan order</HoverButton>
             )}
             {canMarkPaid && (
-              <HoverButton onClick={() => { s.patchOrder(sel.id, { pay: 'paid' }); s.showToast('Pembayaran ' + sel.code + ' ditandai lunas') }} style={{ border: `1px solid ${t.inputBorder}`, background: t.surface, color: t.ink, fontSize: 13, fontWeight: 700, borderRadius: 10, padding: '11px 18px' }} hover={{ opacity: 0.75 }}>Tandai sudah dibayar</HoverButton>
+              <HoverButton onClick={() => { s.patchOrder(sel.id, { pay: 'paid' }); s.showToast('Pembayaran ' + sel.code + ' ditandai lunas') }} style={{ border: `1px solid ${t.inputBorder}`, background: t.surface, color: t.ink, fontSize: 13, fontWeight: 700, borderRadius: 8, padding: '11px 18px', flex: isMobile ? '1 1 100%' : '0 0 auto' }} hover={{ opacity: 0.75 }}>Tandai sudah dibayar</HoverButton>
             )}
             {canCancel && (
-              <HoverButton onClick={() => { s.patchOrder(sel.id, { status: 'cancelled', pay: 'cancelled' }); s.showToast('Order ' + sel.code + ' dibatalkan, stock dikembalikan') }} style={{ border: `1px solid ${t.dangerBorder}`, background: t.surface, color: BRAND.terracotta, fontSize: 13, fontWeight: 700, borderRadius: 10, padding: '11px 18px' }} hover={{ opacity: 0.75 }}>Batalkan order</HoverButton>
+              <HoverButton onClick={() => { s.patchOrder(sel.id, { status: 'cancelled', pay: 'cancelled' }); s.showToast('Order ' + sel.code + ' dibatalkan, stock dikembalikan') }} style={{ border: `1px solid ${t.dangerBorder}`, background: t.surface, color: BRAND.terracotta, fontSize: 13, fontWeight: 700, borderRadius: 8, padding: '11px 18px', flex: isMobile ? '1 1 100%' : '0 0 auto' }} hover={{ opacity: 0.75 }}>Batalkan order</HoverButton>
             )}
           </div>
         </div>
@@ -225,6 +266,15 @@ function OrderDetail() {
         </div>
       </div>
     </section>
+  )
+}
+
+function MobileMeta({ t, label, value, color, strong }: { t: ReturnType<typeof getTheme>; label: string; value: string; color?: string; strong?: boolean }) {
+  return (
+    <div style={mobileStatStyle(t)}>
+      <div style={{ fontSize: 11.5, color: t.muted, fontWeight: 700, marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 13, color: color || t.ink, fontWeight: strong ? 800 : 600, overflowWrap: 'anywhere' }}>{value}</div>
+    </div>
   )
 }
 

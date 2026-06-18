@@ -15,6 +15,8 @@ import {
   uploadImage,
 } from './api'
 import type {
+  BotMessageDirection,
+  BotMessageCustomer,
   CustomerRow,
   DashboardData,
   Menu,
@@ -31,7 +33,7 @@ import type {
 } from './types'
 
 export type EditMenuId = number | 'new' | null
-export type ListKey = 'orders' | 'customers' | 'subscribers' | 'preorders' | 'menus' | 'stock' | 'users' | 'settings'
+export type ListKey = 'orders' | 'customers' | 'subscribers' | 'botMessages' | 'preorders' | 'menus' | 'stock' | 'users' | 'settings'
 
 /** Koleksi list yang dibutuhkan tiap layar (dashboard pakai summary tersendiri). */
 export const SCREEN_LISTS: Record<Screen, ListKey[]> = {
@@ -42,6 +44,7 @@ export const SCREEN_LISTS: Record<Screen, ListKey[]> = {
   menus: ['menus', 'stock'],
   stock: ['stock'],
   subscribers: ['subscribers'],
+  botMessages: ['botMessages'],
   users: ['users'],
   settings: ['settings'],
 }
@@ -58,10 +61,11 @@ interface ListState {
 }
 const emptyList = (): ListState => ({ rows: [], total: 0, page: 1, limit: 20, totalPages: 1, loaded: false, loading: false })
 
-const LIST_FETCHERS: Record<ListKey, (p: { page: number; limit: number; status?: string }) => Promise<{ rows: any[]; total: number; page: number; limit: number; totalPages: number; counts?: Record<string, number> }>> = {
+const LIST_FETCHERS: Record<ListKey, (p: { page: number; limit: number; status?: string; direction?: string; customerId?: number }) => Promise<{ rows: any[]; total: number; page: number; limit: number; totalPages: number; counts?: Record<string, number> }>> = {
   orders: (p) => api.ordersList(p),
   customers: (p) => api.customersList(p),
   subscribers: (p) => api.subscribersList(p),
+  botMessages: (p) => api.botMessagesList(p),
   preorders: (p) => api.preordersList(p),
   menus: (p) => api.menusList(p),
   stock: (p) => api.stockList(p),
@@ -82,6 +86,11 @@ interface State {
   sidebarCollapsed: boolean
   screen: Screen
   orderFilter: 'all' | OrderStatus
+  botMessageDirection: 'all' | BotMessageDirection
+  botMessageCustomerId: number | null
+  botMessageCustomers: BotMessageCustomer[]
+  botMessageCustomersLoaded: boolean
+  botMessageCustomersLoading: boolean
   orderCounts: Record<string, number>
   subscriberCounts: { active: number; inactive: number }
   selectedOrderId: number | null
@@ -119,7 +128,7 @@ interface State {
 }
 
 const initialLists = (): Record<ListKey, ListState> => ({
-  orders: emptyList(), customers: emptyList(), subscribers: emptyList(), preorders: emptyList(),
+  orders: emptyList(), customers: emptyList(), subscribers: emptyList(), botMessages: emptyList(), preorders: emptyList(),
   menus: emptyList(), stock: emptyList(), users: emptyList(), settings: emptyList(),
 })
 
@@ -134,6 +143,11 @@ const initialState: State = {
   sidebarCollapsed: false,
   screen: 'dashboard',
   orderFilter: 'all',
+  botMessageDirection: 'all',
+  botMessageCustomerId: null,
+  botMessageCustomers: [],
+  botMessageCustomersLoaded: false,
+  botMessageCustomersLoading: false,
   orderCounts: {},
   subscriberCounts: { active: 0, inactive: 0 },
   selectedOrderId: null,
@@ -167,6 +181,8 @@ export interface AdminStore extends State {
   isScreenLoading: () => boolean
   setListPage: (key: ListKey, page: number) => void
   setOrderFilter: (status: 'all' | OrderStatus) => void
+  setBotMessageDirection: (direction: 'all' | BotMessageDirection) => void
+  setBotMessageCustomerId: (customerId: number | null) => void
   // auth
   doLogin: () => void
   doLogout: () => void
@@ -254,7 +270,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...s, lists: { ...s.lists, [key]: { ...s.lists[key], loading } } }))
 
   // Muat satu list (dedup in-flight; skip kalau sudah loaded kecuali force/ganti page/status).
-  const loadList = useCallback((key: ListKey, opts: { page?: number; status?: string; force?: boolean } = {}) => {
+  const loadList = useCallback((key: ListKey, opts: { page?: number; status?: string; direction?: 'all' | BotMessageDirection; customerId?: number | null; force?: boolean } = {}) => {
     const ik = `list:${key}`
     if (inflight.current.has(ik)) return
     if (opts.page === undefined && opts.status === undefined && !opts.force && listLoaded.current.has(key)) return
@@ -266,7 +282,15 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         const cur = stateRef.current
         const page = opts.page ?? cur.lists[key].page
         const status = key === 'orders' ? (opts.status ?? cur.orderFilter) : undefined
-        const res = await LIST_FETCHERS[key]({ page, limit: cur.lists[key].limit, status })
+        const direction = key === 'botMessages' ? (opts.direction ?? cur.botMessageDirection) : undefined
+        const customerId = key === 'botMessages' ? (opts.customerId ?? cur.botMessageCustomerId) : undefined
+        const res = await LIST_FETCHERS[key]({
+          page,
+          limit: cur.lists[key].limit,
+          status,
+          direction: direction && direction !== 'all' ? direction : undefined,
+          customerId: customerId ?? undefined,
+        })
         listLoaded.current.add(key)
         setState((s) => ({
           ...s,
@@ -298,6 +322,31 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         fail(e)
       } finally {
         inflight.current.delete('dashboard')
+      }
+    })()
+  }, [fail])
+
+  const loadBotMessageCustomers = useCallback((force = false) => {
+    const ik = 'bot-message-customers'
+    if (inflight.current.has(ik)) return
+    if (!force && stateRef.current.botMessageCustomersLoaded) return
+
+    inflight.current.add(ik)
+    setState((s) => ({ ...s, botMessageCustomersLoading: true }))
+    void (async () => {
+      try {
+        const rows = await api.botMessageCustomers()
+        setState((s) => ({
+          ...s,
+          botMessageCustomers: rows,
+          botMessageCustomersLoaded: true,
+          botMessageCustomersLoading: false,
+        }))
+      } catch (e) {
+        setState((s) => ({ ...s, botMessageCustomersLoading: false }))
+        fail(e)
+      } finally {
+        inflight.current.delete(ik)
       }
     })()
   }, [fail])
@@ -344,8 +393,11 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const ensureScreen = useCallback(() => {
     const sc = stateRef.current.screen
     if (sc === 'dashboard') loadDashboard()
-    else SCREEN_LISTS[sc].forEach((k) => loadList(k))
-  }, [loadDashboard, loadList])
+    else {
+      SCREEN_LISTS[sc].forEach((k) => loadList(k))
+      if (sc === 'botMessages') loadBotMessageCustomers()
+    }
+  }, [loadBotMessageCustomers, loadDashboard, loadList])
 
   // Validasi token tersimpan dengan satu call /me.
   const validateSession = useCallback(async () => {
@@ -454,14 +506,33 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       ensureScreen,
       refresh: () => {
         if (state.screen === 'dashboard') loadDashboard(true)
-        else currentLists.forEach((k) => loadList(k, { force: true }))
+        else {
+          currentLists.forEach((k) => loadList(k, { force: true }))
+          if (state.screen === 'botMessages') loadBotMessageCustomers(true)
+        }
       },
-      isScreenReady: () => (state.screen === 'dashboard' ? state.dashboardLoaded : currentLists.every((k) => state.lists[k].loaded)),
-      isScreenLoading: () => (state.screen === 'dashboard' ? state.dashboardLoading : currentLists.some((k) => state.lists[k].loading)),
+      isScreenReady: () => {
+        if (state.screen === 'dashboard') return state.dashboardLoaded
+        const listsReady = currentLists.every((k) => state.lists[k].loaded)
+        return state.screen === 'botMessages' ? listsReady && state.botMessageCustomersLoaded : listsReady
+      },
+      isScreenLoading: () => {
+        if (state.screen === 'dashboard') return state.dashboardLoading
+        const listsLoading = currentLists.some((k) => state.lists[k].loading)
+        return state.screen === 'botMessages' ? listsLoading || state.botMessageCustomersLoading : listsLoading
+      },
       setListPage: (key, page) => loadList(key, { page, force: true }),
       setOrderFilter: (status) => {
         setState((s) => ({ ...s, orderFilter: status }))
         loadList('orders', { page: 1, status, force: true })
+      },
+      setBotMessageDirection: (direction) => {
+        setState((s) => ({ ...s, botMessageDirection: direction }))
+        loadList('botMessages', { page: 1, direction, force: true })
+      },
+      setBotMessageCustomerId: (customerId) => {
+        setState((s) => ({ ...s, botMessageCustomerId: customerId }))
+        loadList('botMessages', { page: 1, customerId, force: true })
       },
       patchOrder,
 
@@ -690,7 +761,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       openImage: (img) => { if (img) set({ lightboxImage: img }); else showToast('Belum ada foto — buka Edit untuk menambah') },
       closeLightbox: () => set({ lightboxImage: null }),
     }
-  }, [state, set, update, showToast, ensureScreen, loadDashboard, loadList, loadPreorderOrders, patchOrder, debounceSave, fail])
+  }, [state, set, update, showToast, ensureScreen, loadDashboard, loadBotMessageCustomers, loadList, loadPreorderOrders, patchOrder, debounceSave, fail])
 
   return <AdminContext.Provider value={store}>{children}</AdminContext.Provider>
 }

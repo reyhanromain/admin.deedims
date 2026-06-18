@@ -7,7 +7,7 @@ export function inputStyle(t: Theme, extra?: CSSProperties): CSSProperties {
     width: '100%',
     padding: '10px 12px',
     border: `1px solid ${t.inputBorder}`,
-    borderRadius: 10,
+    borderRadius: 8,
     fontSize: 13.5,
     color: t.ink,
     outline: 'none',
@@ -21,7 +21,7 @@ export function cardStyle(t: Theme, extra?: CSSProperties): CSSProperties {
   return {
     background: t.surface,
     border: `1px solid ${t.border}`,
-    borderRadius: 16,
+    borderRadius: 8,
     ...extra,
   }
 }
@@ -49,5 +49,23 @@ export function tableHeadStyle(t: Theme, minWidth: number): CSSProperties {
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
     minWidth,
+  }
+}
+
+export function mobileMetaGrid(): CSSProperties {
+  return {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    gap: 8,
+  }
+}
+
+export function mobileStatStyle(t: Theme): CSSProperties {
+  return {
+    background: t.surfaceAlt,
+    border: `1px solid ${t.rowBorder}`,
+    borderRadius: 8,
+    padding: '10px 12px',
+    minWidth: 0,
   }
 }

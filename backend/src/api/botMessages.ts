@@ -8,6 +8,27 @@ import { formatJakarta } from '../time'
 export async function botMessagesRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authenticate)
 
+  // GET /api/bot-messages/customers
+  app.get('/customers', async () => {
+    const rows = await prisma.customer.findMany({
+      where: { messages: { some: {} } },
+      orderBy: [{ name: 'asc' }, { username: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        _count: { select: { messages: true } },
+      },
+    })
+
+    return ok(rows.map((c) => ({
+      id: c.id,
+      name: c.name,
+      username: c.username,
+      messageCount: c._count.messages,
+    })))
+  })
+
   // GET /api/bot-messages?customerId=&direction=&page=&limit=
   app.get('/', async (req) => {
     const q = req.query as { customerId?: string; direction?: 'incoming' | 'outgoing' }

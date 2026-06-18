@@ -11,7 +11,7 @@ export function Settings() {
   const list = s.lists.settings
 
   return (
-    <section style={{ maxWidth: 640 }}>
+    <section style={{ maxWidth: 640, width: '100%' }}>
       <p style={{ margin: '0 0 16px 0', fontSize: 13.5, color: t.muted }}>Konfigurasi bot yang bisa diubah tanpa deploy ulang.</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {(list.rows as Setting[]).map((st, i) => (
@@ -29,7 +29,7 @@ export function Settings() {
               <input
                 value={st.value}
                 onChange={(e) => s.updateSetting(i, e.target.value)}
-                style={inputStyle(t, { width: 120 })}
+                style={inputStyle(t, { width: 'min(100%, 160px)' })}
               />
             )}
           </div>

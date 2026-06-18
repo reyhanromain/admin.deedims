@@ -1,4 +1,6 @@
 import type {
+  BotMessage,
+  BotMessageCustomer,
   CustomerOrderRow,
   CustomerRow,
   DashboardData,
@@ -167,6 +169,28 @@ export const mapSubscriber = (r: any): Subscriber => ({
   username: r.telegramUsername ?? '(tanpa username)', name: r.telegramUsername ?? '', since: fmtDay(r.createdAt), active: r.isActive,
 })
 
+export const mapBotMessage = (r: any): BotMessage => ({
+  id: r.id,
+  direction: r.direction,
+  messageType: r.messageType ?? 'text',
+  text: r.text ?? '',
+  telegramUsername: r.telegramUsername ?? '',
+  customerName: r.customerName ?? '',
+  isCommand: !!r.isCommand,
+  command: r.command ?? '',
+  customerId: r.customerId ?? null,
+  receivedAt: r.receivedAtLabel ?? '',
+  telegramUserId: r.telegramUserId ?? null,
+  telegramChatId: r.telegramChatId ?? '',
+})
+
+export const mapBotMessageCustomer = (r: any): BotMessageCustomer => ({
+  id: r.id,
+  username: r.username ?? `user${r.id}`,
+  name: r.name ?? '(tanpa nama)',
+  messageCount: r.messageCount ?? 0,
+})
+
 export const mapSetting = (r: any): Setting => ({ id: r.id, label: r.label, desc: r.description ?? '', value: r.value ?? '', textarea: r.inputType === 'textarea' })
 
 export const mapUser = (r: any): User => ({ id: r.id, username: r.username, name: r.fullName, password: '', super: r.isSuper })
@@ -201,6 +225,8 @@ export const api = {
   customerOrders: (id: number, p: { page?: number; limit?: number }) => getPaged(`/customers/${id}/orders`, p, mapCustomerOrderRow),
   preorderOrders: (id: number, p: { page?: number; limit?: number }) => getPaged(`/preorders/${id}/orders`, p, mapOrderRow),
   subscribersList: (p: { page?: number; limit?: number }) => getPaged('/subscribers', p, mapSubscriber),
+  botMessagesList: (p: { customerId?: number; direction?: string; page?: number; limit?: number }) => getPaged('/bot-messages', p, mapBotMessage),
+  botMessageCustomers: () => request<unknown[]>('GET', '/bot-messages/customers').then((rows) => rows.map(mapBotMessageCustomer)),
   preordersList: (p: { page?: number; limit?: number }) => getPaged('/preorders', p, mapPreorderRow),
   menusList: (p: { page?: number; limit?: number }) => getPaged('/menus', p, mapMenu),
   stockList: (p: { page?: number; limit?: number }) => getPaged('/stock', p, mapStock),

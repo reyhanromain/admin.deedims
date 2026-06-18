@@ -4,6 +4,7 @@ import { cardStyle, inputStyle, labelStyle, tableHeadStyle } from '../styles'
 import { HoverButton } from '../ui'
 import { Pager } from '../components/Pager'
 import type { StockItem } from '../types'
+import { useIsMobile } from '../responsive'
 
 const GRID = '1.5fr 1fr 1fr 170px'
 
@@ -11,6 +12,7 @@ export function Stock() {
   const s = useAdmin()
   const t = getTheme(s.dark)
   const list = s.lists.stock
+  const isMobile = useIsMobile()
 
   return (
     <section>
@@ -56,31 +58,60 @@ export function Stock() {
         </div>
       )}
 
-      <div style={cardStyle(t, { overflowX: 'auto' })}>
-        <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 12, ...tableHeadStyle(t, 640) }}>
-          <div>Stock item</div><div>Label</div><div>Sisa</div><div style={{ textAlign: 'right' }}>Adjust</div>
+      {isMobile ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {(list.rows as StockItem[]).map((item) => {
+            const isLow = item.quantity <= LOW_STOCK_THRESHOLD
+            return (
+              <div key={item.id} style={cardStyle(t, { padding: 14 })}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 800 }}>{item.name}</div>
+                    <div style={{ fontSize: 12.5, color: t.muted, fontFamily: 'monospace', marginTop: 2 }}>{item.label}</div>
+                  </div>
+                  {isLow && <span style={{ background: t.warnBg, color: t.warnColor, fontSize: 10.5, fontWeight: 800, borderRadius: 99, padding: '3px 8px' }}>MENIPIS</span>}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, marginBottom: 12 }}>
+                  <span style={{ fontSize: 24, fontWeight: 800, color: isLow ? t.red : t.ink }}>{item.quantity}</span>
+                  <span style={{ fontSize: 13, color: t.muted, fontWeight: 700 }}>{item.unit}</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 6 }}>
+                  <HoverButton onClick={() => s.adjustStock(item.id, -10)} style={{ border: `1px solid ${t.inputBorder}`, background: t.surface, fontSize: 12, fontWeight: 800, borderRadius: 8, padding: '8px 6px', color: t.ink }} hover={{ opacity: 0.7 }}>−10</HoverButton>
+                  <HoverButton onClick={() => s.adjustStock(item.id, -1)} style={{ border: `1px solid ${t.inputBorder}`, background: t.surface, fontSize: 12, fontWeight: 800, borderRadius: 8, padding: '8px 6px', color: t.ink }} hover={{ opacity: 0.7 }}>−1</HoverButton>
+                  <HoverButton onClick={() => s.adjustStock(item.id, 1)} style={{ border: 'none', background: t.solidBg, color: t.solidColor, fontSize: 12, fontWeight: 800, borderRadius: 8, padding: '8px 6px' }} hover={{ opacity: 0.85 }}>+1</HoverButton>
+                  <HoverButton onClick={() => s.adjustStock(item.id, 10)} style={{ border: 'none', background: t.solidBg, color: t.solidColor, fontSize: 12, fontWeight: 800, borderRadius: 8, padding: '8px 6px' }} hover={{ opacity: 0.85 }}>+10</HoverButton>
+                </div>
+              </div>
+            )
+          })}
         </div>
-        {(list.rows as StockItem[]).map((item) => {
-          const isLow = item.quantity <= LOW_STOCK_THRESHOLD
-          return (
-            <div key={item.id} style={{ display: 'grid', gridTemplateColumns: GRID, gap: 12, padding: '13px 20px', borderBottom: `1px solid ${t.rowBorder}`, alignItems: 'center', minWidth: 640 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 700 }}>{item.name}</div>
-              <div style={{ fontSize: 12.5, color: t.muted, fontFamily: 'monospace' }}>{item.label}</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 15, fontWeight: 800, color: isLow ? t.red : t.ink }}>{item.quantity}</span>
-                <span style={{ fontSize: 12, color: t.muted }}>{item.unit}</span>
-                {isLow && <span style={{ background: t.warnBg, color: t.warnColor, fontSize: 10.5, fontWeight: 700, borderRadius: 99, padding: '2px 8px' }}>MENIPIS</span>}
+      ) : (
+        <div style={cardStyle(t, { overflowX: 'auto' })}>
+          <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 12, ...tableHeadStyle(t, 640) }}>
+            <div>Stock item</div><div>Label</div><div>Sisa</div><div style={{ textAlign: 'right' }}>Adjust</div>
+          </div>
+          {(list.rows as StockItem[]).map((item) => {
+            const isLow = item.quantity <= LOW_STOCK_THRESHOLD
+            return (
+              <div key={item.id} style={{ display: 'grid', gridTemplateColumns: GRID, gap: 12, padding: '13px 20px', borderBottom: `1px solid ${t.rowBorder}`, alignItems: 'center', minWidth: 640 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 700 }}>{item.name}</div>
+                <div style={{ fontSize: 12.5, color: t.muted, fontFamily: 'monospace' }}>{item.label}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 15, fontWeight: 800, color: isLow ? t.red : t.ink }}>{item.quantity}</span>
+                  <span style={{ fontSize: 12, color: t.muted }}>{item.unit}</span>
+                  {isLow && <span style={{ background: t.warnBg, color: t.warnColor, fontSize: 10.5, fontWeight: 700, borderRadius: 99, padding: '2px 8px' }}>MENIPIS</span>}
+                </div>
+                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                  <HoverButton onClick={() => s.adjustStock(item.id, -10)} style={{ border: `1px solid ${t.inputBorder}`, background: t.surface, fontSize: 12, fontWeight: 700, borderRadius: 8, padding: '6px 9px', color: t.ink }} hover={{ opacity: 0.7 }}>−10</HoverButton>
+                  <HoverButton onClick={() => s.adjustStock(item.id, -1)} style={{ border: `1px solid ${t.inputBorder}`, background: t.surface, fontSize: 12, fontWeight: 700, borderRadius: 8, padding: '6px 10px', color: t.ink }} hover={{ opacity: 0.7 }}>−1</HoverButton>
+                  <HoverButton onClick={() => s.adjustStock(item.id, 1)} style={{ border: 'none', background: t.solidBg, color: t.solidColor, fontSize: 12, fontWeight: 700, borderRadius: 8, padding: '6px 10px' }} hover={{ opacity: 0.85 }}>+1</HoverButton>
+                  <HoverButton onClick={() => s.adjustStock(item.id, 10)} style={{ border: 'none', background: t.solidBg, color: t.solidColor, fontSize: 12, fontWeight: 700, borderRadius: 8, padding: '6px 9px' }} hover={{ opacity: 0.85 }}>+10</HoverButton>
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                <HoverButton onClick={() => s.adjustStock(item.id, -10)} style={{ border: `1px solid ${t.inputBorder}`, background: t.surface, fontSize: 12, fontWeight: 700, borderRadius: 8, padding: '6px 9px', color: t.ink }} hover={{ opacity: 0.7 }}>−10</HoverButton>
-                <HoverButton onClick={() => s.adjustStock(item.id, -1)} style={{ border: `1px solid ${t.inputBorder}`, background: t.surface, fontSize: 12, fontWeight: 700, borderRadius: 8, padding: '6px 10px', color: t.ink }} hover={{ opacity: 0.7 }}>−1</HoverButton>
-                <HoverButton onClick={() => s.adjustStock(item.id, 1)} style={{ border: 'none', background: t.solidBg, color: t.solidColor, fontSize: 12, fontWeight: 700, borderRadius: 8, padding: '6px 10px' }} hover={{ opacity: 0.85 }}>+1</HoverButton>
-                <HoverButton onClick={() => s.adjustStock(item.id, 10)} style={{ border: 'none', background: t.solidBg, color: t.solidColor, fontSize: 12, fontWeight: 700, borderRadius: 8, padding: '6px 9px' }} hover={{ opacity: 0.85 }}>+10</HoverButton>
-              </div>
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+      )}
 
       <Pager page={list.page} totalPages={list.totalPages} loading={list.loading} onPage={(p) => s.setListPage('stock', p)} />
     </section>

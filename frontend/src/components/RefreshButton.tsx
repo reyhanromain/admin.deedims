@@ -15,7 +15,7 @@ export function RefreshButton() {
       disabled={loading}
       style={{
         width: 36, height: 36, border: `1px solid ${t.inputBorder}`, background: t.surface, color: t.ink,
-        borderRadius: 99, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        borderRadius: 99, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
       }}
       hover={{ opacity: 0.75 }}
     >

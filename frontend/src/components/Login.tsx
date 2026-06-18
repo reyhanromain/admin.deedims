@@ -2,18 +2,20 @@ import { useAdmin } from '../store'
 import { getTheme, BRAND } from '../theme'
 import { inputStyle, labelStyle } from '../styles'
 import { HoverButton } from '../ui'
+import { useIsMobile } from '../responsive'
 
 export function Login() {
   const s = useAdmin()
   const t = getTheme(s.dark)
+  const isMobile = useIsMobile()
   return (
     <div
       style={{
-        height: '100vh',
+        minHeight: '100dvh',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 24,
+        padding: isMobile ? 14 : 24,
       }}
     >
       <div
@@ -22,8 +24,8 @@ export function Login() {
           maxWidth: '100%',
           background: t.surface,
           border: `1px solid ${t.border}`,
-          borderRadius: 20,
-          padding: '36px 32px',
+          borderRadius: 8,
+          padding: isMobile ? '28px 20px' : '36px 32px',
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 26 }}>

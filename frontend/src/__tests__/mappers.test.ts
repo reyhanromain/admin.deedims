@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   fmtDateTime,
+  mapBotMessage,
+  mapBotMessageCustomer,
   mapCustomerRow,
   mapDashboard,
   mapMenu,
@@ -67,6 +69,14 @@ describe('mapPreorderRow / mapCustomerRow / mapSubscriber / mapSetting / mapUser
   })
   it('subscriber: telegramUsername→username, isActive→active', () => {
     expect(mapSubscriber({ telegramUsername: 'sari', isActive: true, createdAt: '2026-05-02T03:00:00Z' })).toMatchObject({ username: 'sari', active: true, since: '02 May 2026' })
+  })
+  it('bot message: nullable DTO fields become display-safe strings', () => {
+    expect(mapBotMessage({ id: 1, direction: 'incoming', messageType: null, text: null, telegramUsername: null, customerName: 'Sari', isCommand: false, command: null, customerId: 1, receivedAtLabel: '12 Jun 2026, 09:13', telegramUserId: null, telegramChatId: '9001' }))
+      .toEqual({ id: 1, direction: 'incoming', messageType: 'text', text: '', telegramUsername: '', customerName: 'Sari', isCommand: false, command: '', customerId: 1, receivedAt: '12 Jun 2026, 09:13', telegramUserId: null, telegramChatId: '9001' })
+  })
+  it('bot message customer: maps compact filter row', () => {
+    expect(mapBotMessageCustomer({ id: 1, username: 'sari', name: 'Sari', messageCount: 3 }))
+      .toEqual({ id: 1, username: 'sari', name: 'Sari', messageCount: 3 })
   })
   it('setting: inputType textarea→true', () => {
     expect(mapSetting({ id: 1, label: 'k', value: 'v', description: 'd', inputType: 'textarea' })).toEqual({ id: 1, label: 'k', desc: 'd', value: 'v', textarea: true })

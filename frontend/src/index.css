@@ -1,12 +1,15 @@
-html, body { margin: 0; padding: 0; }
+html, body { margin: 0; padding: 0; width: 100%; overflow-x: hidden; }
 * { box-sizing: border-box; }
 
 body {
   font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%;
 }
 
 #root {
-  height: 100vh;
+  min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
 }
 
 input, textarea, button, select { font-family: inherit; }
@@ -34,3 +37,20 @@ input::placeholder, textarea::placeholder { color: inherit; opacity: 0.45; }
 *::-webkit-scrollbar { width: 10px; height: 10px; }
 *::-webkit-scrollbar-thumb { background: rgba(138,114,99,0.35); border-radius: 99px; }
 *::-webkit-scrollbar-track { background: transparent; }
+
+@media (max-width: 759px) {
+  html, body, #root {
+    min-height: 100%;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+    min-height: 44px;
+  }
+
+  button {
+    touch-action: manipulation;
+  }
+}

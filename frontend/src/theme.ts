@@ -134,6 +134,7 @@ export const ICONS: Record<Screen, string> = {
   menus: 'M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2 M7 2v20 M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7',
   stock: 'M21 8v13H3V8 M1 3h22v5H1z M10 12h4',
   subscribers: 'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9 M10.3 21a1.94 1.94 0 0 0 3.4 0',
+  botMessages: 'M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z M8 9h8 M8 13h5',
   users: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z M9 12l2 2 4-4',
   settings: 'M21 4h-7 M10 4H3 M21 12h-9 M8 12H3 M21 20h-5 M12 20H3 M14 2v4 M8 10v4 M16 18v4',
 }
@@ -146,6 +147,7 @@ export const SCREEN_TITLES: Record<Screen, string> = {
   menus: 'Menus & Add-ons',
   stock: 'Stock Items',
   subscribers: 'Reminder Subscribers',
+  botMessages: 'Bot Messages',
   users: 'Admin Users',
   settings: 'Bot Settings',
 }
@@ -158,6 +160,7 @@ export const SCREEN_NAV: { id: Screen; label: string }[] = [
   { id: 'menus', label: 'Menus' },
   { id: 'stock', label: 'Stock' },
   { id: 'subscribers', label: 'Subscribers' },
+  { id: 'botMessages', label: 'Bot Messages' },
   { id: 'users', label: 'Users' },
   { id: 'settings', label: 'Settings' },
 ]

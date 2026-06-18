@@ -1,16 +1,18 @@
 import { useAdmin } from '../store'
 import { getTheme, BRAND, orderStatusBadge, poStatusBadge, inactiveBadge } from '../theme'
 import { fmt, initials } from '../format'
-import { cardStyle, tableHeadStyle } from '../styles'
+import { cardStyle, mobileMetaGrid, mobileStatStyle, tableHeadStyle } from '../styles'
 import { HoverButton, Hoverable, Icon, Pill } from '../ui'
 import { Pager } from '../components/Pager'
 import type { CustomerOrderRow, CustomerRow } from '../types'
+import { useIsMobile } from '../responsive'
 
 const GRID = 'minmax(180px, 1fr) 72px 130px 140px 100px'
 
 export function Customers() {
   const s = useAdmin()
   const t = getTheme(s.dark)
+  const isMobile = useIsMobile()
   const po = poStatusBadge(s.dark)
   const inactive = inactiveBadge(s.dark)
   const list = s.lists.customers
@@ -26,43 +28,79 @@ export function Customers() {
       <p style={{ margin: '0 0 16px 0', fontSize: 13.5, color: t.muted }}>
         Customer yang pernah berinteraksi dengan bot, beserta riwayat pesanannya.
       </p>
-      <div style={cardStyle(t, { overflowX: 'auto' })}>
-        <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 12, ...tableHeadStyle(t, 620) }}>
-          <div>Customer</div><div>Orders</div>
-          <div style={{ textAlign: 'right' }}>Total belanja</div><div>Order terakhir</div><div>Reminder</div>
-        </div>
-        {rows.map((c) => {
-          const sb = subBadge(c.reminderActive)
-          return (
-            <Hoverable
-              key={c.username}
-              onClick={() => s.set({ selectedCustomerU: c.username })}
-              style={{ display: 'grid', gridTemplateColumns: GRID, gap: 12, padding: '13px 20px', borderBottom: `1px solid ${t.rowBorder}`, alignItems: 'center', cursor: 'pointer', minWidth: 620 }}
-              hover={{ filter: 'brightness(0.98)' }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
-                <div style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 99, background: t.chipBg, color: t.chipColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800 }}>
-                  {initials(c.name)}
-                </div>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
-                    <span style={{ fontSize: 13.5, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{c.name}</span>
-                    {c.blocked && (
-                      <span style={{ flexShrink: 0, background: t.dangerBg, color: t.dangerInk, fontSize: 10, fontWeight: 800, borderRadius: 99, padding: '2px 8px' }}>DIBLOKIR</span>
-                    )}
+      {isMobile ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {rows.map((c) => {
+            const sb = subBadge(c.reminderActive)
+            return (
+              <Hoverable key={c.username} onClick={() => s.set({ selectedCustomerU: c.username })} style={cardStyle(t, { padding: 14, cursor: 'pointer' })} hover={{ filter: 'brightness(0.98)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0, marginBottom: 12 }}>
+                  <div style={{ width: 40, height: 40, flexShrink: 0, borderRadius: 99, background: t.chipBg, color: t.chipColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800 }}>
+                    {initials(c.name)}
                   </div>
-                  <div style={{ fontSize: 12, color: t.faint, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>@{c.username}</div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 14, fontWeight: 800, minWidth: 0 }}>{c.name}</span>
+                      {c.blocked && (
+                        <span style={{ flexShrink: 0, background: t.dangerBg, color: t.dangerInk, fontSize: 10, fontWeight: 800, borderRadius: 99, padding: '2px 8px' }}>DIBLOKIR</span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 12.5, color: t.faint }}>@{c.username}</div>
+                  </div>
+                  <Pill bg={sb.bg} color={sb.color}>{sb.text}</Pill>
                 </div>
-              </div>
-              <div style={{ fontSize: 13.5, fontWeight: 700 }}>{c.orderCount}</div>
-              <div style={{ fontSize: 13.5, fontWeight: 700, textAlign: 'right' }}>{fmt(c.totalSpent)}</div>
-              <div style={{ fontSize: 12.5, color: t.muted }}>{c.lastOrder}</div>
-              <div><Pill bg={sb.bg} color={sb.color}>{sb.text}</Pill></div>
-            </Hoverable>
-          )
-        })}
-        {rows.length === 0 && <div style={{ padding: 36, textAlign: 'center', fontSize: 13.5, color: t.faint }}>Belum ada customer.</div>}
-      </div>
+                <div style={mobileMetaGrid()}>
+                  <MobileCustomerMeta t={t} label="Orders" value={String(c.orderCount)} />
+                  <MobileCustomerMeta t={t} label="Total" value={fmt(c.totalSpent)} />
+                  <div style={{ ...mobileStatStyle(t), gridColumn: '1 / -1' }}>
+                    <div style={{ fontSize: 11.5, color: t.muted, fontWeight: 700, marginBottom: 2 }}>Order terakhir</div>
+                    <div style={{ fontSize: 13, fontWeight: 700 }}>{c.lastOrder}</div>
+                  </div>
+                </div>
+              </Hoverable>
+            )
+          })}
+          {rows.length === 0 && <div style={cardStyle(t, { padding: 24, textAlign: 'center', fontSize: 13.5, color: t.faint })}>Belum ada customer.</div>}
+        </div>
+      ) : (
+        <div style={cardStyle(t, { overflowX: 'auto' })}>
+          <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 12, ...tableHeadStyle(t, 620) }}>
+            <div>Customer</div><div>Orders</div>
+            <div style={{ textAlign: 'right' }}>Total belanja</div><div>Order terakhir</div><div>Reminder</div>
+          </div>
+          {rows.map((c) => {
+            const sb = subBadge(c.reminderActive)
+            return (
+              <Hoverable
+                key={c.username}
+                onClick={() => s.set({ selectedCustomerU: c.username })}
+                style={{ display: 'grid', gridTemplateColumns: GRID, gap: 12, padding: '13px 20px', borderBottom: `1px solid ${t.rowBorder}`, alignItems: 'center', cursor: 'pointer', minWidth: 620 }}
+                hover={{ filter: 'brightness(0.98)' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
+                  <div style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 99, background: t.chipBg, color: t.chipColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800 }}>
+                    {initials(c.name)}
+                  </div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+                      <span style={{ fontSize: 13.5, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{c.name}</span>
+                      {c.blocked && (
+                        <span style={{ flexShrink: 0, background: t.dangerBg, color: t.dangerInk, fontSize: 10, fontWeight: 800, borderRadius: 99, padding: '2px 8px' }}>DIBLOKIR</span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 12, color: t.faint, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>@{c.username}</div>
+                  </div>
+                </div>
+                <div style={{ fontSize: 13.5, fontWeight: 700 }}>{c.orderCount}</div>
+                <div style={{ fontSize: 13.5, fontWeight: 700, textAlign: 'right' }}>{fmt(c.totalSpent)}</div>
+                <div style={{ fontSize: 12.5, color: t.muted }}>{c.lastOrder}</div>
+                <div><Pill bg={sb.bg} color={sb.color}>{sb.text}</Pill></div>
+              </Hoverable>
+            )
+          })}
+          {rows.length === 0 && <div style={{ padding: 36, textAlign: 'center', fontSize: 13.5, color: t.faint }}>Belum ada customer.</div>}
+        </div>
+      )}
 
       <Pager page={list.page} totalPages={list.totalPages} loading={list.loading} onPage={(p) => s.setListPage('customers', p)} />
     </section>
@@ -72,6 +110,7 @@ export function Customers() {
 function CustomerDetail({ customer }: { customer: CustomerRow }) {
   const s = useAdmin()
   const t = getTheme(s.dark)
+  const isMobile = useIsMobile()
   const status = orderStatusBadge(s.dark)
   const po = poStatusBadge(s.dark)
   const inactive = inactiveBadge(s.dark)
@@ -89,7 +128,7 @@ function CustomerDetail({ customer }: { customer: CustomerRow }) {
       >
         ← Kembali ke daftar customer
       </button>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(250px, 1fr) minmax(320px, 1.8fr)', gap: 16, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(250px, 1fr) minmax(320px, 1.8fr)', gap: 16, alignItems: 'start' }}>
         <div style={cardStyle(t, { padding: 22 })}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
             <div style={{ width: 52, height: 52, borderRadius: 99, background: t.chipBg, color: t.chipColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 800 }}>
@@ -167,5 +206,14 @@ function CustomerDetail({ customer }: { customer: CustomerRow }) {
         </div>
       </div>
     </section>
+  )
+}
+
+function MobileCustomerMeta({ t, label, value }: { t: ReturnType<typeof getTheme>; label: string; value: string }) {
+  return (
+    <div style={mobileStatStyle(t)}>
+      <div style={{ fontSize: 11.5, color: t.muted, fontWeight: 700, marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 13, fontWeight: 800, overflowWrap: 'anywhere' }}>{value}</div>
+    </div>
   )
 }
