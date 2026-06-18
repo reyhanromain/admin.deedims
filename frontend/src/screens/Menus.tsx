@@ -49,7 +49,9 @@ function MenuCard({ menu: m, usageOf }: { menu: Menu; usageOf: (v: Variant) => s
   const t = getTheme(s.dark)
   const isMobile = useIsMobile()
   const expanded = s.expandedMenuId === m.id
-  const addonNames = m.addons.map((a) => (s.lists.menus.rows as Menu[]).find((x) => x.id === a)?.name || '—')
+  const linkedMenus = s.lists.menus.rows as Menu[]
+  const paidAddonNames = m.addons.filter((a) => !m.freeAddons.includes(a)).map((a) => linkedMenus.find((x) => x.id === a)?.name || '—')
+  const freeAddonNames = m.freeAddons.map((a) => linkedMenus.find((x) => x.id === a)?.name || '—')
 
   return (
     <div style={cardStyle(t, { overflow: 'hidden' })}>
@@ -115,12 +117,15 @@ function MenuCard({ menu: m, usageOf }: { menu: Menu; usageOf: (v: Variant) => s
               </div>
             ))}
           </div>
-          {m.addons.length > 0 && (
+          {(paidAddonNames.length > 0 || freeAddonNames.length > 0) && (
             <>
-              <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: t.muted, marginBottom: 8 }}>Add-ons tersedia</div>
+              <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: t.muted, marginBottom: 8 }}>Add-ons & free menu</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {addonNames.map((name, i) => (
-                  <span key={i} style={{ background: t.chipBg, color: t.chipColor, fontSize: 12, fontWeight: 700, borderRadius: 99, padding: '5px 12px' }}>{name}</span>
+                {paidAddonNames.map((name, i) => (
+                  <span key={'paid-' + i} style={{ background: t.chipBg, color: t.chipColor, fontSize: 12, fontWeight: 700, borderRadius: 99, padding: '5px 12px' }}>{name}</span>
+                ))}
+                {freeAddonNames.map((name, i) => (
+                  <span key={'free-' + i} style={{ background: s.dark ? '#244836' : '#DDEDE4', color: BRAND.bamboo, fontSize: 12, fontWeight: 800, borderRadius: 99, padding: '5px 12px' }}>Free: {name}</span>
                 ))}
               </div>
             </>

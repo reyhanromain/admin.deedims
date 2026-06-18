@@ -31,6 +31,7 @@ function shapeMenu(m: MenuRow) {
       qty: v.stockUsages[0]?.quantity ?? null,
     })),
     addons: m.addonLinks.map((a) => a.addonMenuId),
+    freeAddons: m.addonLinks.filter((a) => a.isFree).map((a) => a.addonMenuId),
   }
 }
 
@@ -51,6 +52,7 @@ const menuSchema = z.object({
   telegramFileId: z.string().nullable().optional(),
   variants: z.array(variantSchema).default([]),
   addons: z.array(z.number().int()).default([]),
+  freeAddons: z.array(z.number().int()).default([]),
 })
 
 type MenuInput = z.infer<typeof menuSchema>
@@ -67,8 +69,10 @@ async function writeChildren(tx: Prisma.TransactionClient, menuId: number, data:
     })
   }
   if (!data.isAddon) {
-    for (const addonMenuId of data.addons) {
-      await tx.menuAddon.create({ data: { menuId, addonMenuId } })
+    const addonIds = Array.from(new Set([...data.addons, ...data.freeAddons]))
+    const freeIds = new Set(data.freeAddons)
+    for (const addonMenuId of addonIds) {
+      await tx.menuAddon.create({ data: { menuId, addonMenuId, isFree: freeIds.has(addonMenuId) } })
     }
   }
 }

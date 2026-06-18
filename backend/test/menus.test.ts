@@ -16,17 +16,19 @@ describe('menus', () => {
     expect(a.variants[0]).toEqual({ name: 'Reg', price: 10000, stockId: 1, qty: 2 })
     expect(a).not.toHaveProperty('telegramFileId')
     expect(a.addons).toEqual([2])
+    expect(a.freeAddons).toEqual([])
     expect(meta(res)).toMatchObject({ page: 1, total: 2 })
   })
 
   it('create menu dengan variant + addon → 201', async () => {
     const res = await app.inject({
       method: 'POST', url: '/api/menus', headers: authH(token),
-      payload: { name: 'Baru', basePrice: 9000, variants: [{ name: 'V', price: 9000, stockId: 1, qty: 1 }], addons: [2] },
+      payload: { name: 'Baru', basePrice: 9000, variants: [{ name: 'V', price: 9000, stockId: 1, qty: 1 }], addons: [2], freeAddons: [2] },
     })
     expect(res.statusCode).toBe(201)
     expect(data(res).variants[0]).toEqual({ name: 'V', price: 9000, stockId: 1, qty: 1 })
     expect(data(res).addons).toEqual([2])
+    expect(data(res).freeAddons).toEqual([2])
   })
 
   it('ganti imageUrl me-reset telegramFileId (aturan hybrid)', async () => {
@@ -57,6 +59,17 @@ describe('menus', () => {
     expect(m.variants).toHaveLength(1)
     expect(m.variants[0].price).toBe(12000)
     expect(m.addonLinks).toHaveLength(0)
+  })
+
+  it('patch menyimpan freeAddons sebagai relasi add-on gratis', async () => {
+    const res = await app.inject({
+      method: 'PATCH', url: '/api/menus/1', headers: authH(token),
+      payload: { name: 'Menu A', basePrice: 10000, variants: [{ name: 'Reg', price: 10000, stockId: 1, qty: 2 }], addons: [], freeAddons: [2] },
+    })
+    expect(data(res).addons).toEqual([2])
+    expect(data(res).freeAddons).toEqual([2])
+    const link = await prisma.menuAddon.findFirstOrThrow({ where: { menuId: 1, addonMenuId: 2 } })
+    expect(link.isFree).toBe(true)
   })
 
   it('toggle → data {id,isActive}', async () => {

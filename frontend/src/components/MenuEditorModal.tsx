@@ -152,18 +152,30 @@ export function MenuEditorModal() {
           {/* add-ons */}
           {!d.isAddon && (
             <div style={{ borderTop: `1px solid ${t.rowBorder}`, paddingTop: 16 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 4 }}>Add-on yang dipasang</div>
-              <div style={{ fontSize: 11.5, color: t.faint, marginBottom: 10 }}>Centang add-on yang bisa ditambahkan customer ke menu ini.</div>
+              <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 4 }}>Add-on & free menu</div>
+              <div style={{ fontSize: 11.5, color: t.faint, marginBottom: 10 }}>Pilih Berbayar untuk add-on biasa, atau Free jika menu pelengkap otomatis gratis di menu ini.</div>
               {addonChoices.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
                   {addonChoices.map((ac) => {
-                    const checked = d.addons.includes(ac.id)
+                    const free = d.freeAddons.includes(ac.id)
+                    const paid = d.addons.includes(ac.id) && !free
                     return (
-                      <label key={ac.id} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 12px', border: `1px solid ${checked ? t.chipColor : t.inputBorder}`, background: checked ? t.chipBg : t.surface, borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-                        <input type="checkbox" checked={checked} onChange={() => s.toggleAddon(ac.id)} style={{ width: 16, height: 16, accentColor: BRAND.terracotta }} />
-                        <span style={{ flex: 1 }}>{ac.name}</span>
-                        <span style={{ fontSize: 12.5, color: t.muted, fontWeight: 700 }}>{fmt(ac.basePrice)}</span>
-                      </label>
+                      <div key={ac.id} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr auto', gap: 10, alignItems: 'center', padding: '10px 12px', border: `1px solid ${free || paid ? t.chipColor : t.inputBorder}`, background: free || paid ? t.chipBg : t.surface, borderRadius: 10 }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, overflowWrap: 'anywhere' }}>{ac.name}</div>
+                          <div style={{ fontSize: 12.5, color: t.muted, fontWeight: 700, marginTop: 2 }}>{free ? 'Free menu' : paid ? 'Add-on berbayar' : fmt(ac.basePrice)}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: isMobile ? 'flex-start' : 'flex-end' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, border: `1px solid ${paid ? BRAND.terracotta : t.inputBorder}`, background: paid ? BRAND.terracotta : t.surface, color: paid ? '#fff' : t.ink, borderRadius: 8, padding: '7px 10px', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={paid} onChange={() => s.toggleAddon(ac.id)} style={{ width: 14, height: 14, accentColor: BRAND.terracotta }} />
+                            Berbayar
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, border: `1px solid ${free ? BRAND.bamboo : t.inputBorder}`, background: free ? BRAND.bamboo : t.surface, color: free ? '#fff' : t.ink, borderRadius: 8, padding: '7px 10px', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={free} onChange={() => s.toggleFreeAddon(ac.id)} style={{ width: 14, height: 14, accentColor: BRAND.bamboo }} />
+                            Free
+                          </label>
+                        </div>
+                      </div>
                     )
                   })}
                 </div>

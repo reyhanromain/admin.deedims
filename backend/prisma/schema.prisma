@@ -186,6 +186,7 @@ model MenuAddon {
   addonMenuId Int      @map("addon_menu_id")
   addonMenu   Menu     @relation("AddonMenu", fields: [addonMenuId], references: [id])
   isRequired  Boolean  @default(false) @map("is_required")
+  isFree      Boolean  @default(false) @map("is_free")
   maxQuantity Int      @default(1) @map("max_quantity")
   sortOrder   Int      @default(0) @map("sort_order")
   isActive    Boolean  @default(true) @map("is_active")

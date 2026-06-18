@@ -210,6 +210,7 @@ export interface AdminStore extends State {
   addVariant: () => void
   removeVariant: (i: number) => void
   toggleAddon: (id: number) => void
+  toggleFreeAddon: (id: number) => void
   setDraftImageFromFile: (file: File) => void
   saveMenu: () => void
   // stock
@@ -689,10 +690,10 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       },
       openMenuEditor: (menu) => {
         if (menu) {
-          set({ editMenuId: menu.id, menuDraft: JSON.parse(JSON.stringify(menu)) })
+          set({ editMenuId: menu.id, menuDraft: { ...JSON.parse(JSON.stringify(menu)), freeAddons: menu.freeAddons ?? [] } })
         } else {
           const firstStock = state.lists.stock.rows[0] ? (state.lists.stock.rows[0] as StockItem).id : 1
-          set({ editMenuId: 'new', menuDraft: { name: '', description: '', basePrice: 0, active: true, isAddon: false, image: '', variants: [{ name: '(default)', price: 0, stockId: firstStock, qty: 1 }], addons: [] } })
+          set({ editMenuId: 'new', menuDraft: { name: '', description: '', basePrice: 0, active: true, isAddon: false, image: '', variants: [{ name: '(default)', price: 0, stockId: firstStock, qty: 1 }], addons: [], freeAddons: [] } })
         }
       },
       closeMenuEditor: () => set({ editMenuId: null, menuDraft: null }),
@@ -705,8 +706,13 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       removeVariant: (i) => update((s) => (s.menuDraft ? { menuDraft: { ...s.menuDraft, variants: s.menuDraft.variants.filter((_, j) => j !== i) } } : {})),
       toggleAddon: (id) => update((s) => {
         if (!s.menuDraft) return {}
-        const has = s.menuDraft.addons.includes(id)
-        return { menuDraft: { ...s.menuDraft, addons: has ? s.menuDraft.addons.filter((a) => a !== id) : [...s.menuDraft.addons, id] } }
+        const isPaid = s.menuDraft.addons.includes(id) && !s.menuDraft.freeAddons.includes(id)
+        return { menuDraft: { ...s.menuDraft, addons: isPaid ? s.menuDraft.addons.filter((a) => a !== id) : Array.from(new Set([...s.menuDraft.addons, id])), freeAddons: s.menuDraft.freeAddons.filter((a) => a !== id) } }
+      }),
+      toggleFreeAddon: (id) => update((s) => {
+        if (!s.menuDraft) return {}
+        const has = s.menuDraft.freeAddons.includes(id)
+        return { menuDraft: { ...s.menuDraft, addons: has ? s.menuDraft.addons.filter((a) => a !== id) : Array.from(new Set([...s.menuDraft.addons, id])), freeAddons: has ? s.menuDraft.freeAddons.filter((a) => a !== id) : [...s.menuDraft.freeAddons, id] } }
       }),
       setDraftImageFromFile: (file) => {
         void (async () => {

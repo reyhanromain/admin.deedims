@@ -28,6 +28,8 @@ export interface Menu {
   variants: Variant[]
   /** ids of add-on menus attached to this menu */
   addons: number[]
+  /** ids of attached add-on menus that are included for free */
+  freeAddons: number[]
 }
 
 export interface OrderItem {
@@ -213,6 +215,7 @@ export interface MenuDraft {
   image: string
   variants: Variant[]
   addons: number[]
+  freeAddons: number[]
 }
 
 export interface UserDraft {

@@ -1,0 +1,1 @@
+ALTER TABLE "menu_addons" ADD COLUMN "is_free" BOOLEAN NOT NULL DEFAULT false;

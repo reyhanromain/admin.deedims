@@ -128,6 +128,7 @@ export const mapMenu = (r: any): Menu => ({
   image: r.imageUrl ?? '',
   variants: (r.variants ?? []).map((v: any) => ({ name: v.name ?? '', price: v.price, stockId: v.stockId ?? 0, qty: v.qty ?? 1 })),
   addons: r.addons ?? [],
+  freeAddons: r.freeAddons ?? [],
 })
 
 export const mapPreorderRow = (r: any): PreorderRow => ({
@@ -210,6 +211,7 @@ export const menuToApi = (d: MenuDraft) => ({
   isActive: d.active, isAddon: d.isAddon, imageUrl: d.image || null,
   variants: d.variants.map((v) => ({ name: v.name || null, price: Number(v.price) || 0, stockId: v.stockId, qty: Number(v.qty) || 1 })),
   addons: d.isAddon ? [] : d.addons,
+  freeAddons: d.isAddon ? [] : d.freeAddons,
 })
 
 // ── Endpoint ─────────────────────────────────────────────

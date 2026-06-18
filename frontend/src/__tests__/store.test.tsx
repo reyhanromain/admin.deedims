@@ -32,7 +32,7 @@ const paged = (rows: any[], extra: Record<string, unknown> = {}) => ({ rows, tot
 
 const orderRow = { id: 1, code: 'DD-1', customer: 'Sari', username: 'sari', createdAt: '12 Jun, 09:13', itemsSummary: 'Menu A x1', total: 10000, status: 'confirmed', pay: 'pending', cancelRequested: true }
 const orderDetail = { id: 1, code: 'DD-1', customer: 'Sari', username: 'sari', createdAt: '12 Jun, 09:13', updatedAt: '12 Jun, 10:00', status: 'confirmed', pay: 'pending', adminNotes: '', cancelRequested: true, total: 10000, items: [{ name: 'Menu A', meta: '', qty: 1, price: 10000, addon: false }], poTitle: 'PO Open', poDate: '14 Jun 2026' }
-const menuRow = { id: 1, name: 'Menu A', description: '', basePrice: 10000, active: true, isAddon: false, image: '', variants: [{ name: 'Reg', price: 10000, stockId: 1, qty: 2 }], addons: [2] }
+const menuRow = { id: 1, name: 'Menu A', description: '', basePrice: 10000, active: true, isAddon: false, image: '', variants: [{ name: 'Reg', price: 10000, stockId: 1, qty: 2 }], addons: [2], freeAddons: [] }
 const stockRow = { id: 1, label: 's1', name: 'Stock 1', quantity: 50, unit: 'pcs' }
 const poOpen = { id: 1, title: 'PO Open', description: '', status: 'open', date: '14 Jun 2026', note: '', orderCount: 1, revenue: 10000 }
 const poDraft = { id: 2, title: 'PO Draft', description: '', status: 'draft', date: 'TBD', note: '—', orderCount: 0, revenue: 0 }
@@ -141,7 +141,7 @@ describe('menus', () => {
   })
 
   it('saveMenu baru → createMenu body + prepend', async () => {
-    api.createMenu.mockResolvedValue({ id: 9, name: 'Baru', description: null, basePrice: 9000, isActive: true, isAddon: false, imageUrl: null, variants: [], addons: [] })
+    api.createMenu.mockResolvedValue({ id: 9, name: 'Baru', description: null, basePrice: 9000, isActive: true, isAddon: false, imageUrl: null, variants: [], addons: [], freeAddons: [] })
     const r = await mountAuthed()
     await goto(r, 'menus')
     act(() => r.current.openMenuEditor(null))
@@ -149,6 +149,18 @@ describe('menus', () => {
     act(() => r.current.saveMenu())
     await waitFor(() => expect(api.createMenu).toHaveBeenCalledWith(expect.objectContaining({ name: 'Baru', basePrice: 9000, isActive: true })))
     await waitFor(() => expect((r.current.lists.menus.rows as any[]).some((m) => m.id === 9)).toBe(true))
+  })
+
+  it('toggleFreeAddon membuat add-on gratis dan masuk body saveMenu', async () => {
+    api.updateMenu.mockResolvedValue({ id: 1, name: 'Menu A', description: '', basePrice: 10000, isActive: true, isAddon: false, imageUrl: '', variants: [{ name: 'Reg', price: 10000, stockId: 1, qty: 2 }], addons: [2], freeAddons: [2] })
+    const r = await mountAuthed()
+    await goto(r, 'menus')
+    act(() => r.current.openMenuEditor(menuRow as any))
+    act(() => r.current.toggleFreeAddon(2))
+    expect(r.current.menuDraft?.addons).toEqual([2])
+    expect(r.current.menuDraft?.freeAddons).toEqual([2])
+    act(() => r.current.saveMenu())
+    await waitFor(() => expect(api.updateMenu).toHaveBeenCalledWith(1, expect.objectContaining({ addons: [2], freeAddons: [2] })))
   })
 })
 

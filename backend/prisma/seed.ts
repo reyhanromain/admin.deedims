@@ -18,7 +18,24 @@ const starterStock = [
   { label: 'chili-oil', name: 'Chili Oil', quantity: 0, unit: 'cup', isActive: true },
 ]
 
-const starterMenus = [
+type StarterMenu = {
+  key: string
+  name: string
+  description: string
+  basePrice: number
+  isActive: boolean
+  imageUrl: string | null
+  isAddon: boolean
+  variants: Array<{
+    name: string
+    price: number
+    stock: Array<{ label: string; quantity: number }>
+  }>
+  addons: string[]
+  freeAddons: string[]
+}
+
+const starterMenus: StarterMenu[] = [
   {
     key: 'dimsum-mentai',
     name: 'Dimsum Mentai',
@@ -33,7 +50,8 @@ const starterMenus = [
       { name: 'Mini Party', price: 70000, stock: [{ label: 'dimsum', quantity: 12 }] },
       { name: 'Full Party', price: 85000, stock: [{ label: 'dimsum', quantity: 16 }] },
     ],
-    addons: ['chili-oil'],
+    addons: [],
+    freeAddons: ['chili-oil'],
   },
   {
     key: 'dimsum-original',
@@ -49,6 +67,7 @@ const starterMenus = [
       { name: 'Full Party', price: 73000, stock: [{ label: 'dimsum', quantity: 16 }] },
     ],
     addons: ['chili-oil'],
+    freeAddons: [],
   },
   {
     key: 'dimsum-ori-x-mentai',
@@ -62,6 +81,7 @@ const starterMenus = [
       { name: '(default)', price: 85000, stock: [{ label: 'dimsum', quantity: 16 }] },
     ],
     addons: ['chili-oil'],
+    freeAddons: [],
   },
   {
     key: 'chili-oil',
@@ -75,6 +95,7 @@ const starterMenus = [
       { name: '(default)', price: 5000, stock: [{ label: 'chili-oil', quantity: 1 }] },
     ],
     addons: [],
+    freeAddons: [],
   },
 ]
 
@@ -179,11 +200,13 @@ async function seedCatalog() {
 
   for (const menu of starterMenus) {
     const menuId = menuByKey.get(menu.key)!
-    for (const addonKey of menu.addons) {
+    const addonKeys = Array.from(new Set([...menu.addons, ...menu.freeAddons]))
+    for (const addonKey of addonKeys) {
       await prisma.menuAddon.create({
         data: {
           menuId,
           addonMenuId: menuByKey.get(addonKey)!,
+          isFree: menu.freeAddons.includes(addonKey),
           isRequired: false,
           maxQuantity: 1,
           sortOrder: 0,
