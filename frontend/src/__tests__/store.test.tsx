@@ -14,7 +14,7 @@ vi.mock('../api', async (orig) => {
       login: fn(), me: fn(), dashboard: fn(), order: fn(),
       ordersList: fn(), customersList: fn(), customerOrders: fn(), preorderOrders: fn(), subscribersList: fn(), preordersList: fn(),
       botMessagesList: fn(), botMessageCustomers: fn(), menusList: fn(), stockList: fn(), usersList: fn(), settingsList: fn(),
-      adjustStock: fn(), createStock: fn(), createMenu: fn(), updateMenu: fn(), toggleMenu: fn(),
+      adjustStock: fn(), createStock: fn(), updateStock: fn(), createMenu: fn(), updateMenu: fn(), toggleMenu: fn(),
       createPreorder: fn(), openPreorder: fn(), closePreorder: fn(), completePreorder: fn(),
       patchOrder: fn(), approveCancel: fn(), rejectCancel: fn(), blockCustomer: fn(),
       createUser: fn(), updateUser: fn(), deleteUser: fn(), updateSetting: fn(),
@@ -56,6 +56,7 @@ beforeEach(() => {
   api.preorderOrders.mockResolvedValue(paged([orderRow]))
   api.menusList.mockResolvedValue(paged([menuRow]))
   api.stockList.mockResolvedValue(paged([stockRow]))
+  api.updateStock.mockResolvedValue({ id: 1, label: 'satu', name: 'Stock Satu', quantity: 12, unit: 'pack' })
   api.usersList.mockResolvedValue(paged(users))
   api.settingsList.mockResolvedValue(paged([{ id: 7, label: 'k', desc: 'd', value: 'v', textarea: false }]))
 })
@@ -215,6 +216,17 @@ describe('stock optimistic & customers', () => {
     act(() => r.current.adjustStock(1, 5))
     expect((r.current.lists.stock.rows as any[]).find((x) => x.id === 1).quantity).toBe(55)
     expect(api.adjustStock).toHaveBeenCalledWith(1, 5)
+  })
+
+  it('edit stock mengubah nama, label, quantity, dan unit', async () => {
+    const r = await mountAuthed()
+    await goto(r, 'stock')
+    act(() => r.current.openStockEditor(stockRow))
+    act(() => r.current.set({ sName: 'Stock Satu', sLabel: 'satu', sQty: '12', sUnit: 'pack' }))
+    act(() => r.current.saveStock())
+    await waitFor(() => expect(api.updateStock).toHaveBeenCalledWith(1, { label: 'satu', name: 'Stock Satu', quantity: 12, unit: 'pack' }))
+    await waitFor(() => expect((r.current.lists.stock.rows as any[]).find((x) => x.id === 1)).toMatchObject({ label: 'satu', name: 'Stock Satu', quantity: 12, unit: 'pack' }))
+    expect(r.current.showStockForm).toBe(false)
   })
 
   it('toggleBlockCustomer pakai id', async () => {

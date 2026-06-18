@@ -239,6 +239,7 @@ export const api = {
   // mutations (data ter-unwrap)
   adjustStock: (id: number, delta: number) => request<any>('POST', `/stock/${id}/adjust`, { delta }),
   createStock: (b: Json) => request<any>('POST', '/stock', b),
+  updateStock: (id: number, b: Json) => request<any>('PATCH', `/stock/${id}`, b),
   createMenu: (b: Json) => request<any>('POST', '/menus', b),
   updateMenu: (id: number, b: Json) => request<any>('PATCH', `/menus/${id}`, b),
   toggleMenu: (id: number) => request<{ id: number; isActive: boolean }>('POST', `/menus/${id}/toggle`),

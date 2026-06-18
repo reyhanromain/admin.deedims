@@ -41,7 +41,7 @@
 
 ## Components
 - Existing components to reuse: `Sidebar`, `Header`, `Pager`, `MenuEditorModal`, `UserEditorModal`, `HoverButton`, `Pill`, shared theme/style helpers.
-- New/changed components: Responsive hook, mobile card layouts for table-heavy screens, and Bot Messages conversation bubbles in a scrollable thread with newest messages at the bottom.
+- New/changed components: Responsive hook, mobile card layouts for table-heavy screens, Stock create/edit form reuse, and Bot Messages conversation bubbles in a scrollable thread with newest messages at the bottom.
 - Variants and states: Desktop table/list variants, mobile card variants, modal bottom-sheet variant, incoming/outgoing message bubbles.
 - Token/component ownership: Continue using `frontend/src/theme.ts` tokens and repo-local helpers.
 

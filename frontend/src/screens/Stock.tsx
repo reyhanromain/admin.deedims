@@ -6,7 +6,7 @@ import { Pager } from '../components/Pager'
 import type { StockItem } from '../types'
 import { useIsMobile } from '../responsive'
 
-const GRID = '1.5fr 1fr 1fr 170px'
+const GRID = '1.5fr 1fr 1fr 230px'
 
 export function Stock() {
   const s = useAdmin()
@@ -19,7 +19,7 @@ export function Stock() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
         <p style={{ margin: 0, fontSize: 13.5, color: t.muted }}>Stock global — dipotong saat order disubmit, bukan saat masuk cart.</p>
         <HoverButton
-          onClick={() => s.set({ showStockForm: !s.showStockForm })}
+          onClick={() => (s.showStockForm ? s.closeStockEditor() : s.openStockEditor(null))}
           style={{ border: 'none', background: BRAND.terracotta, color: '#fff', fontSize: 13, fontWeight: 700, borderRadius: 10, padding: '10px 18px' }}
           hover={{ background: BRAND.terracottaDark }}
         >
@@ -29,7 +29,7 @@ export function Stock() {
 
       {s.showStockForm && (
         <div style={cardStyle(t, { padding: '20px 22px', marginBottom: 18 })}>
-          <h2 style={{ margin: '0 0 14px 0', fontSize: 15, fontWeight: 700 }}>Stock item baru</h2>
+          <h2 style={{ margin: '0 0 14px 0', fontSize: 15, fontWeight: 700 }}>{s.editStockId == null ? 'Stock item baru' : 'Edit stock item'}</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 16 }}>
             <div>
               <label style={labelStyle(t)}>Nama</label>
@@ -48,13 +48,22 @@ export function Stock() {
               <input value={s.sUnit} onChange={(e) => s.set({ sUnit: e.target.value })} placeholder="pcs / pack / jar" style={inputStyle(t)} />
             </div>
           </div>
-          <HoverButton
-            onClick={s.createStock}
-            style={{ border: 'none', background: BRAND.bamboo, color: '#fff', fontSize: 13, fontWeight: 700, borderRadius: 10, padding: '10px 18px' }}
-            hover={{ background: BRAND.bambooDark }}
-          >
-            Simpan stock item
-          </HoverButton>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <HoverButton
+              onClick={s.saveStock}
+              style={{ border: 'none', background: BRAND.bamboo, color: '#fff', fontSize: 13, fontWeight: 700, borderRadius: 10, padding: '10px 18px' }}
+              hover={{ background: BRAND.bambooDark }}
+            >
+              {s.editStockId == null ? 'Simpan stock item' : 'Simpan perubahan'}
+            </HoverButton>
+            <HoverButton
+              onClick={s.closeStockEditor}
+              style={{ border: `1px solid ${t.inputBorder}`, background: t.surface, color: t.ink, fontSize: 13, fontWeight: 700, borderRadius: 10, padding: '10px 18px' }}
+              hover={{ opacity: 0.75 }}
+            >
+              Batal
+            </HoverButton>
+          </div>
         </div>
       )}
 
@@ -69,7 +78,10 @@ export function Stock() {
                     <div style={{ fontSize: 14, fontWeight: 800 }}>{item.name}</div>
                     <div style={{ fontSize: 12.5, color: t.muted, fontFamily: 'monospace', marginTop: 2 }}>{item.label}</div>
                   </div>
-                  {isLow && <span style={{ background: t.warnBg, color: t.warnColor, fontSize: 10.5, fontWeight: 800, borderRadius: 99, padding: '3px 8px' }}>MENIPIS</span>}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                    {isLow && <span style={{ background: t.warnBg, color: t.warnColor, fontSize: 10.5, fontWeight: 800, borderRadius: 99, padding: '3px 8px' }}>MENIPIS</span>}
+                    <HoverButton onClick={() => s.openStockEditor(item)} style={{ border: `1px solid ${t.inputBorder}`, background: t.surface, color: t.ink, fontSize: 12, fontWeight: 800, borderRadius: 8, padding: '7px 10px' }} hover={{ opacity: 0.75 }}>Edit</HoverButton>
+                  </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, marginBottom: 12 }}>
                   <span style={{ fontSize: 24, fontWeight: 800, color: isLow ? t.red : t.ink }}>{item.quantity}</span>
@@ -87,13 +99,13 @@ export function Stock() {
         </div>
       ) : (
         <div style={cardStyle(t, { overflowX: 'auto' })}>
-          <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 12, ...tableHeadStyle(t, 640) }}>
+          <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 12, ...tableHeadStyle(t, 700) }}>
             <div>Stock item</div><div>Label</div><div>Sisa</div><div style={{ textAlign: 'right' }}>Adjust</div>
           </div>
           {(list.rows as StockItem[]).map((item) => {
             const isLow = item.quantity <= LOW_STOCK_THRESHOLD
             return (
-              <div key={item.id} style={{ display: 'grid', gridTemplateColumns: GRID, gap: 12, padding: '13px 20px', borderBottom: `1px solid ${t.rowBorder}`, alignItems: 'center', minWidth: 640 }}>
+              <div key={item.id} style={{ display: 'grid', gridTemplateColumns: GRID, gap: 12, padding: '13px 20px', borderBottom: `1px solid ${t.rowBorder}`, alignItems: 'center', minWidth: 700 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 700 }}>{item.name}</div>
                 <div style={{ fontSize: 12.5, color: t.muted, fontFamily: 'monospace' }}>{item.label}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -102,6 +114,7 @@ export function Stock() {
                   {isLow && <span style={{ background: t.warnBg, color: t.warnColor, fontSize: 10.5, fontWeight: 700, borderRadius: 99, padding: '2px 8px' }}>MENIPIS</span>}
                 </div>
                 <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                  <HoverButton onClick={() => s.openStockEditor(item)} style={{ border: `1px solid ${t.inputBorder}`, background: t.surface, fontSize: 12, fontWeight: 700, borderRadius: 8, padding: '6px 10px', color: t.ink }} hover={{ opacity: 0.7 }}>Edit</HoverButton>
                   <HoverButton onClick={() => s.adjustStock(item.id, -10)} style={{ border: `1px solid ${t.inputBorder}`, background: t.surface, fontSize: 12, fontWeight: 700, borderRadius: 8, padding: '6px 9px', color: t.ink }} hover={{ opacity: 0.7 }}>−10</HoverButton>
                   <HoverButton onClick={() => s.adjustStock(item.id, -1)} style={{ border: `1px solid ${t.inputBorder}`, background: t.surface, fontSize: 12, fontWeight: 700, borderRadius: 8, padding: '6px 10px', color: t.ink }} hover={{ opacity: 0.7 }}>−1</HoverButton>
                   <HoverButton onClick={() => s.adjustStock(item.id, 1)} style={{ border: 'none', background: t.solidBg, color: t.solidColor, fontSize: 12, fontWeight: 700, borderRadius: 8, padding: '6px 10px' }} hover={{ opacity: 0.85 }}>+1</HoverButton>

@@ -107,6 +107,7 @@ interface State {
   poDate: string
   poNote: string
   showStockForm: boolean
+  editStockId: number | null
   sName: string
   sLabel: string
   sQty: string
@@ -159,7 +160,7 @@ const initialState: State = {
   preorderOrders: emptyList(),
   expandedMenuId: null,
   showPoForm: false, poTitle: '', poDesc: '', poDate: '', poNote: '',
-  showStockForm: false, sName: '', sLabel: '', sQty: '', sUnit: '',
+  showStockForm: false, editStockId: null, sName: '', sLabel: '', sQty: '', sUnit: '',
   editMenuId: null, menuDraft: null,
   showUserForm: false, uName: '', uFull: '', uPass: '',
   editUserU: null, userDraft: null,
@@ -213,6 +214,9 @@ export interface AdminStore extends State {
   saveMenu: () => void
   // stock
   adjustStock: (id: number, delta: number) => void
+  openStockEditor: (item: StockItem | null) => void
+  closeStockEditor: () => void
+  saveStock: () => void
   createStock: () => void
   // users
   createUser: () => void
@@ -497,6 +501,58 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const updatePreorderRow = (id: number, patch: Partial<PreorderRow>) =>
     update((s) => ({ lists: { ...s.lists, preorders: { ...s.lists.preorders, rows: s.lists.preorders.rows.map((p: PreorderRow) => (p.id === id ? { ...p, ...patch } : p)) } } }))
 
+  const saveStock = useCallback(() => {
+    const cur = stateRef.current
+    const editingId = cur.editStockId
+    const name = cur.sName.trim()
+    const label = cur.sLabel.trim() || name.toLowerCase().replace(/\s+/g, '-')
+    const quantity = Math.max(0, parseInt(cur.sQty, 10) || 0)
+    const unit = cur.sUnit.trim() || 'pcs'
+
+    if (!name) { showToast('Nama stock wajib diisi'); return }
+    if (!label) { showToast('Label stock wajib diisi'); return }
+    if (cur.lists.stock.rows.some((x: StockItem) => x.label === label && x.id !== editingId)) {
+      showToast('Label "' + label + '" sudah dipakai — harus unik')
+      return
+    }
+
+    void (async () => {
+      try {
+        const body = { label, name, quantity, unit }
+        if (editingId != null) {
+          const r = await api.updateStock(editingId, body)
+          const row = mapStock(r)
+          update((s) => ({
+            lists: { ...s.lists, stock: { ...s.lists.stock, rows: s.lists.stock.rows.map((x: StockItem) => (x.id === editingId ? row : x)) } },
+            dashboard: s.dashboard ? { ...s.dashboard, lowStock: s.dashboard.lowStock.map((x) => (x.id === editingId ? { ...x, name: row.name, quantity: row.quantity, unit: row.unit } : x)) } : s.dashboard,
+            showStockForm: false,
+            editStockId: null,
+            sName: '',
+            sLabel: '',
+            sQty: '',
+            sUnit: '',
+          }))
+          showToast('Stock item diperbarui')
+        } else {
+          const r = await api.createStock(body)
+          update((s) => ({
+            lists: { ...s.lists, stock: { ...s.lists.stock, rows: [...s.lists.stock.rows, mapStock(r)] } },
+            showStockForm: false,
+            editStockId: null,
+            sName: '',
+            sLabel: '',
+            sQty: '',
+            sUnit: '',
+          }))
+          showToast('Stock item dibuat')
+        }
+      } catch (e) {
+        fail(e)
+        if (editingId != null) loadList('stock', { force: true })
+      }
+    })()
+  }, [fail, loadList, showToast, update])
+
   const store = useMemo<AdminStore>(() => {
     const currentLists = state.screen === 'dashboard' ? [] : SCREEN_LISTS[state.screen]
     return {
@@ -691,18 +747,16 @@ export function AdminProvider({ children }: { children: ReactNode }) {
           } catch (e) { fail(e); loadList('stock', { force: true }) }
         })()
       },
-      createStock: () => {
-        if (!state.sName.trim()) { showToast('Nama stock wajib diisi'); return }
-        const label = state.sLabel.trim() || state.sName.trim().toLowerCase().replace(/\s+/g, '-')
-        if (state.lists.stock.rows.some((x: StockItem) => x.label === label)) { showToast('Label "' + label + '" sudah dipakai — harus unik'); return }
-        void (async () => {
-          try {
-            const r = await api.createStock({ label, name: state.sName, quantity: parseInt(state.sQty, 10) || 0, unit: state.sUnit || 'pcs' })
-            update((s) => ({ lists: { ...s.lists, stock: { ...s.lists.stock, rows: [...s.lists.stock.rows, mapStock(r)] } }, showStockForm: false, sName: '', sLabel: '', sQty: '', sUnit: '' }))
-            showToast('Stock item dibuat')
-          } catch (e) { fail(e) }
-        })()
+      openStockEditor: (item) => {
+        if (!item) {
+          set({ showStockForm: true, editStockId: null, sName: '', sLabel: '', sQty: '', sUnit: '' })
+          return
+        }
+        set({ showStockForm: true, editStockId: item.id, sName: item.name, sLabel: item.label, sQty: String(item.quantity), sUnit: item.unit })
       },
+      closeStockEditor: () => set({ showStockForm: false, editStockId: null, sName: '', sLabel: '', sQty: '', sUnit: '' }),
+      saveStock,
+      createStock: saveStock,
 
       createUser: () => {
         const un = state.uName.trim().toLowerCase().replace(/\s+/g, '')
@@ -761,7 +815,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       openImage: (img) => { if (img) set({ lightboxImage: img }); else showToast('Belum ada foto — buka Edit untuk menambah') },
       closeLightbox: () => set({ lightboxImage: null }),
     }
-  }, [state, set, update, showToast, ensureScreen, loadDashboard, loadBotMessageCustomers, loadList, loadPreorderOrders, patchOrder, debounceSave, fail])
+  }, [state, set, update, showToast, ensureScreen, loadDashboard, loadBotMessageCustomers, loadList, loadPreorderOrders, patchOrder, saveStock, debounceSave, fail])
 
   return <AdminContext.Provider value={store}>{children}</AdminContext.Provider>
 }

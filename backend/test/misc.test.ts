@@ -45,6 +45,14 @@ describe('stock', () => {
     const res = await app.inject({ method: 'POST', url: '/api/stock', headers: authH(token), payload: { label: 's1', name: 'X' } })
     expect(res.statusCode).toBe(409)
   })
+  it('update nama, label, quantity, unit', async () => {
+    const res = await app.inject({ method: 'PATCH', url: '/api/stock/1', headers: authH(token), payload: { label: 'satu', name: 'Stock Satu', quantity: 12, unit: 'pack' } })
+    expect(data(res)).toMatchObject({ id: 1, label: 'satu', name: 'Stock Satu', quantity: 12, unit: 'pack' })
+  })
+  it('update label duplikat → 409', async () => {
+    const res = await app.inject({ method: 'PATCH', url: '/api/stock/1', headers: authH(token), payload: { label: 's2' } })
+    expect(res.statusCode).toBe(409)
+  })
   it('list ramping + paginated', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/stock', headers: authH(token) })
     expect(data(res)[0]).not.toHaveProperty('isActive')

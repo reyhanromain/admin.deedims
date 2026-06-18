@@ -7,9 +7,10 @@ import { parsePage } from '../lib/paginate'
 const createSchema = z.object({
   label: z.string().min(1),
   name: z.string().min(1),
-  quantity: z.number().int().default(0),
+  quantity: z.number().int().min(0).default(0),
   unit: z.string().optional(),
 })
+const updateSchema = createSchema.partial()
 
 const idOf = (req: { params: unknown }) => Number((req.params as { id: string }).id)
 const toDto = (s: { id: number; label: string; name: string; quantity: number; unit: string | null }) => ({ id: s.id, label: s.label, name: s.name, quantity: s.quantity, unit: s.unit })
@@ -36,6 +37,24 @@ export async function stockRoutes(app: FastifyInstance) {
     }
     const s = await prisma.stockItem.create({ data: parsed.data })
     reply.code(201)
+    return ok(toDto(s))
+  })
+
+  // PATCH /api/stock/:id — ubah nama, label, jumlah absolut, dan unit.
+  app.patch('/:id', async (req) => {
+    const id = idOf(req)
+    const parsed = updateSchema.safeParse(req.body)
+    if (!parsed.success) throw new HttpError(400, 'Invalid payload', 'VALIDATION')
+
+    const item = await prisma.stockItem.findUnique({ where: { id } })
+    if (!item) throw new HttpError(404, 'Stock tidak ditemukan', 'NOT_FOUND')
+
+    if (parsed.data.label) {
+      const conflict = await prisma.stockItem.findFirst({ where: { label: parsed.data.label, id: { not: id } } })
+      if (conflict) throw new HttpError(409, 'Label sudah dipakai', 'CONFLICT')
+    }
+
+    const s = await prisma.stockItem.update({ where: { id }, data: parsed.data })
     return ok(toDto(s))
   })
 
