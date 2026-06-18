@@ -32,7 +32,7 @@ docker compose up --build
 # frontend → http://localhost:8080   (API diproxy di /api)
 # backend  → http://localhost:3100   (langsung, untuk debug)
 
-# seed database kosong + Super Admin awal (sekali, setelah container backend jalan)
+# seed starter catalog + user awal (sekali, setelah container backend jalan)
 docker compose exec backend npm run seed
 ```
 
@@ -50,7 +50,7 @@ cd backend
 cp .env.example .env
 npm install
 npx prisma migrate dev      # buat DB + migrasi
-npm run seed                # database kosong + Super Admin awal
+npm run seed                # starter catalog + user awal
 npm run dev                 # API :3100 (+ bot kalau BOT_TOKEN diisi)
 
 # frontend (terminal lain)
@@ -59,8 +59,12 @@ npm install
 npm run dev                 # http://localhost:5173
 ```
 
-**Login CMS awal:** `admin` / `deedims123` (super user). Override saat seed dengan
-`SEED_ADMIN_USERNAME`, `SEED_ADMIN_NAME`, dan `SEED_ADMIN_PASSWORD` bila perlu.
+**Login CMS awal:** `admin` / `deedims123` (super user). Starter seed juga membuat user `dita`
+dengan password yang sama kecuali `SEED_USER_PASSWORD` diisi. Override Super Admin saat seed
+dengan `SEED_ADMIN_USERNAME`, `SEED_ADMIN_NAME`, dan `SEED_ADMIN_PASSWORD` bila perlu.
+
+Starter seed menyimpan path foto menu di `/uploads`. Jika menjalankan seed di volume/mesin baru,
+salin juga file upload terkait agar foto menu tetap tampil.
 
 ## Test
 
