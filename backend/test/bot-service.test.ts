@@ -31,9 +31,10 @@ describe('bot ordering domain', () => {
   it('menampilkan hanya menu orderable saat PO open', async () => {
     const result = await listOrderableMenus()
     expect(result.preOrder?.id).toBe(1)
-    expect(result.menus.map((menu) => menu.name)).toEqual(['Menu A'])
+    expect(result.menus.map((menu) => menu.name)).toEqual(['Menu A', 'Addon B'])
 
     await prisma.stockItem.update({ where: { id: 1 }, data: { quantity: 1 } })
+    await prisma.stockItem.update({ where: { id: 2 }, data: { quantity: 0 } })
     expect((await listOrderableMenus()).menus).toHaveLength(0)
   })
 

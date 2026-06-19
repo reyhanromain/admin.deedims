@@ -53,7 +53,7 @@ export async function listOrderableMenus() {
   const preOrder = await openPreOrder()
   if (!preOrder) return { preOrder: null, menus: [] }
   const candidates = await prisma.menu.findMany({
-    where: { isActive: true, isAddon: false },
+    where: { isActive: true },
     include: {
       variants: {
         where: { isActive: true },
@@ -150,7 +150,7 @@ export async function addToCart(input: AddCartInput) {
   }
   if (!await openPreOrder()) throw new BotBusinessError('PREORDER_CLOSED', 'Pre-order sudah tidak dibuka.')
   const main = await prisma.menuVariant.findUnique({ where: { id: input.variantId }, include: variantInclude })
-  if (!main?.isActive || !main.menu.isActive || main.menu.isAddon) {
+  if (!main?.isActive || !main.menu.isActive) {
     throw new BotBusinessError('MENU_INVALID', 'Menu sudah tidak tersedia.')
   }
   let addon: Prisma.MenuVariantGetPayload<{ include: typeof variantInclude }> | null = null

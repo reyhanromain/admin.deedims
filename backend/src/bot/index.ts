@@ -203,7 +203,7 @@ async function showMenuList(ctx: Context, user: TelegramCustomer, requestedPage:
   const pages = Math.max(1, Math.ceil(menus.length / size))
   const page = Math.min(requestedPage, pages)
   const keyboard = new InlineKeyboard()
-  for (const menu of menus.slice((page - 1) * size, page * size)) keyboard.text(menu.name, `o:m:${menu.id}:${page}`).row()
+  for (const menu of menus.slice((page - 1) * size, page * size)) keyboard.text(`${menu.name}${menu.isAddon ? ' (Addon)' : ''}`, `o:m:${menu.id}:${page}`).row()
   if (pages > 1) {
     if (page > 1) keyboard.text('Prev', `o:p:${page - 1}`)
     if (page < pages) keyboard.text('Next', `o:p:${page + 1}`)
@@ -218,7 +218,7 @@ async function showMenuList(ctx: Context, user: TelegramCustomer, requestedPage:
 
 async function showMenu(ctx: Context, _user: TelegramCustomer, menuId: number, page: number, editing: boolean) {
   if (!await openPreOrder()) throw new BotBusinessError('PREORDER_CLOSED', 'Pre-order sudah tidak dibuka.')
-  const menu = await prisma.menu.findFirst({ where: { id: menuId, isActive: true, isAddon: false }, include: { variants: { where: { isActive: true }, orderBy: { id: 'asc' } } } })
+  const menu = await prisma.menu.findFirst({ where: { id: menuId, isActive: true }, include: { variants: { where: { isActive: true }, orderBy: { id: 'asc' } } } })
   if (!menu?.variants.length) throw new BotBusinessError('MENU_INVALID', 'Menu ini sudah tidak bisa dipesan.')
   const keyboard = new InlineKeyboard()
   for (const variant of menu.variants) keyboard.text(`${visibleVariantName(variant.name) ?? 'Add to cart'} - ${money(variant.price)}`, `o:v:${variant.id}:${page}`).row()
@@ -233,11 +233,15 @@ async function showQuantity(ctx: Context, user: TelegramCustomer, variantId: num
   if (!capacity) throw new BotBusinessError('STOCK_INSUFFICIENT', 'Stock untuk menu ini sudah habis atau tidak cukup.')
   const variant = await prisma.menuVariant.findUniqueOrThrow({ where: { id: variantId }, include: { menu: true, stockUsages: { include: { stockItem: true } } } })
   const keyboard = new InlineKeyboard()
-  for (let qty = 1; qty <= Math.min(3, capacity); qty++) keyboard.text(`Add ${qty}`, `o:q:${variantId}:${qty}:${page}`).row()
+  const unitLabel = variant.menu.unitLabel?.trim()
+  for (let qty = 1; qty <= Math.min(3, capacity); qty++) keyboard.text(`Add ${qty}${unitLabel ? ` ${unitLabel}` : ''}`, `o:q:${variantId}:${qty}:${page}`).row()
   keyboard.text('Back', `o:m:${variant.menuId}:${page}`).row().text('Cancel', 'o:cancel')
   const contents = variant.stockUsages.map((usage) => `${usage.quantity}${usage.stockItem.unit ? ` ${usage.stockItem.unit}` : ''} ${usage.stockItem.name}`)
   const contentText = contents.length === 1 ? `Isi: ${contents[0]}\n` : contents.length > 1 ? `Isi:\n${contents.map((item) => `- ${item}`).join('\n')}\n` : ''
-  return edit(ctx, `${variant.menu.name}\n${visibleVariantName(variant.name) ? `Varian: ${variant.name}\n` : ''}${contentText}Harga: ${money(variant.price)}\n\nPilih jumlah yang ingin ditambahkan.`, keyboard)
+  const caption = `${variant.menu.name}\n${visibleVariantName(variant.name) ? `Varian: ${variant.name}\n` : ''}${contentText}Harga: ${money(variant.price)}\n\nPilih jumlah yang ingin ditambahkan.`
+  const imageUrl = variant.imageUrl ?? variant.menu.imageUrl
+  if (imageUrl) return editMenuPhoto(ctx, { id: variant.menuId, imageUrl, telegramFileId: null }, caption, keyboard)
+  return edit(ctx, caption, keyboard)
 }
 
 async function showAddons(ctx: Context, _user: TelegramCustomer, variantId: number, qty: number, page: number) {
