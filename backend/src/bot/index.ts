@@ -14,6 +14,7 @@ import {
   deleteCartItem,
   ensureCustomer,
   getCart,
+  listAutomaticFreeAddonVariants,
   listCustomerOrders,
   listOrderableMenus,
   maxAddableQuantity,
@@ -45,7 +46,7 @@ async function logIncoming(ctx: GrammyContext) {
   const from = ctx.from
   const chat = ctx.chat
   if (!chat) return
-  const text = ctx.message?.text ?? ctx.message?.caption ?? ctx.callbackQuery?.data ?? null
+  const text = ctx.message?.text ?? ctx.message?.caption ?? callbackButtonLabel(ctx) ?? ctx.callbackQuery?.data ?? null
   const isCommand = messageType(ctx) === 'command'
   const customer = from ? await prisma.customer.findUnique({ where: { telegramUserId: BigInt(from.id) } }) : null
   await prisma.botMessage.create({
@@ -67,6 +68,16 @@ async function logIncoming(ctx: GrammyContext) {
   })
 }
 
+function callbackButtonLabel(ctx: GrammyContext) {
+  const callbackData = ctx.callbackQuery?.data
+  const message = ctx.callbackQuery?.message
+  if (!callbackData || !message || !('reply_markup' in message) || !message.reply_markup) return null
+  for (const row of message.reply_markup.inline_keyboard) for (const button of row) {
+    if ('callback_data' in button && button.callback_data === callbackData) return button.text
+  }
+  return null
+}
+
 export function createBot(token = config.botToken): Bot | null {
   if (!token) return null
   const bot = new Bot(token)
@@ -82,15 +93,18 @@ export function createBot(token = config.botToken): Bot | null {
     await next()
   })
 
-  bot.command('start', async (ctx) => guarded(ctx, async (user) => {
-    const intro = await setting('start_quick_intro', 'Halo kak 👋\nSelamat datang di Deedims.')
-    const { preOrder, menus } = await listOrderableMenus()
-    if (!preOrder) return reply(ctx, `${intro}\n\nSaat ini pre-order belum dibuka ya kak.\n\nKalau kakak mau dikabari saat pre-order berikutnya dibuka, silakan kirim /remind_preorder.`)
-    if (!menus.length) return reply(ctx, `${intro}\n\nPre-order sedang dibuka, tapi menu yang bisa dipesan belum tersedia ya kak.\nSilakan cek lagi nanti.`)
-    return reply(ctx, [intro, '', 'Pre-order sedang dibuka ya kak 🎉', '', preOrder.title, preOrder.description,
-      preOrder.fulfillmentDate ? `Pengambilan/pengiriman: ${formatJakarta(preOrder.fulfillmentDate)}` : null,
-      preOrder.fulfillmentNote ? `Catatan: ${preOrder.fulfillmentNote}` : null, '', 'Kalau kakak mau pesan, silakan kirim /order ya.'].filter(Boolean).join('\n'))
-  }))
+  bot.command('start', async (ctx) => {
+    await cancelActiveOrderMessage(ctx)
+    return guarded(ctx, async (user) => {
+      const intro = await setting('start_quick_intro', 'Halo kak 👋\nSelamat datang di Deedims.')
+      const { preOrder, menus } = await listOrderableMenus()
+      if (!preOrder) return reply(ctx, `${intro}\n\nSaat ini pre-order belum dibuka ya kak.\n\nKalau kakak mau dikabari saat pre-order berikutnya dibuka, silakan kirim /remind_preorder.`)
+      if (!menus.length) return reply(ctx, `${intro}\n\nPre-order sedang dibuka, tapi menu yang bisa dipesan belum tersedia ya kak.\nSilakan cek lagi nanti.`)
+      return reply(ctx, [intro, '', 'Pre-order sedang dibuka ya kak 🎉', '', preOrder.title, preOrder.description,
+        preOrder.fulfillmentDate ? `Pengambilan/pengiriman: ${formatJakarta(preOrder.fulfillmentDate)}` : null,
+        preOrder.fulfillmentNote ? `Catatan: ${preOrder.fulfillmentNote}` : null, '', 'Kalau kakak mau pesan, silakan kirim /order ya.'].filter(Boolean).join('\n'))
+    })
+  })
 
   bot.command('remind_preorder', async (ctx) => guarded(ctx, async (user) => {
     const result = await subscribeReminder(user)
@@ -106,9 +120,18 @@ export function createBot(token = config.botToken): Bot | null {
       : 'Kakak belum terdaftar di reminder pre-order ya.\nKalau ingin dikabari saat pre-order dibuka, kirim /remind_preorder.')
   }))
 
-  bot.command('order', async (ctx) => guarded(ctx, async (user) => showMenuList(ctx, user, 1, false)))
-  bot.command('carts', async (ctx) => guarded(ctx, async (user) => showCart(ctx, user, false)))
-  bot.command('my_orders', async (ctx) => guarded(ctx, async (user) => showOrderList(ctx, user, 1, false)))
+  bot.command('order', async (ctx) => {
+    await cancelActiveOrderMessage(ctx)
+    return guarded(ctx, async (user) => showMenuList(ctx, user, 1, false))
+  })
+  bot.command('carts', async (ctx) => {
+    await cancelActiveOrderMessage(ctx)
+    return guarded(ctx, async (user) => showCart(ctx, user, false))
+  })
+  bot.command('my_orders', async (ctx) => {
+    await cancelActiveOrderMessage(ctx)
+    return guarded(ctx, async (user) => showOrderList(ctx, user, 1, false))
+  })
 
   bot.on('callback_query:data', async (ctx) => guarded(ctx, async (user) => {
     await ctx.answerCallbackQuery().catch(() => undefined)
@@ -123,6 +146,9 @@ export function createBot(token = config.botToken): Bot | null {
 async function handleCallback(ctx: Context, user: TelegramCustomer, data: string) {
   const p = data.split(':')
   if (p[0] === 'o') {
+    const customer = await prisma.customer.findUnique({ where: { telegramUserId: user.id }, select: { activeOrderMessageId: true } })
+    const callbackMessageId = ctx.callbackQuery?.message?.message_id
+    if (!callbackMessageId || customer?.activeOrderMessageId !== BigInt(callbackMessageId)) return
     if (p[1] === 'p') return showMenuList(ctx, user, positive(p[2]), true)
     if (p[1] === 'm') return showMenu(ctx, user, positive(p[2]), positive(p[3]), true)
     if (p[1] === 'v') return showQuantity(ctx, user, positive(p[2]), positive(p[3]))
@@ -130,13 +156,16 @@ async function handleCallback(ctx: Context, user: TelegramCustomer, data: string
     if (p[1] === 'cf') return showAddConfirmation(ctx, positive(p[2]), positive(p[3]), Number(p[4]), positive(p[5]))
     if (p[1] === 'add') {
       await addToCart({ telegramUserId: user.id, variantId: positive(p[2]), quantity: positive(p[3]), addonVariantId: Number(p[4]) || undefined })
-      await edit(ctx, 'Berhasil ditambahkan ke cart kak 😊\n\nKakak bisa lanjut pilih menu lain, atau cek keranjang dengan /carts.')
-      return showMenuList(ctx, user, positive(p[5]), false)
+      await edit(ctx, 'Berhasil ditambahkan ke cart kak 😊\n\nKakak bisa lanjut pilih menu lain dengan /order, atau cek keranjang dengan /carts.')
+      await clearActiveOrderMessage(user.id)
+      return
     }
     if (p[1] === 'cancel') return edit(ctx, 'Kak, yakin mau membatalkan proses order ini?\n\nKalau dilanjutkan, semua isi cart kakak akan dikosongkan.', new InlineKeyboard().text('Yes, cancel order', 'o:cancel_yes').row().text('Back', 'o:p:1'))
     if (p[1] === 'cancel_yes') {
       await clearCart(user.id)
-      return edit(ctx, 'Baik kak, proses order dibatalkan dan keranjang sudah dikosongkan.\n\nKalau mau mulai pesan lagi, silakan kirim /order ya 😊')
+      await edit(ctx, 'Baik kak, proses order dibatalkan dan keranjang sudah dikosongkan.\n\nKalau mau mulai pesan lagi, silakan kirim /order ya 😊')
+      await clearActiveOrderMessage(user.id)
+      return
     }
   }
   if (p[0] === 'c') {
@@ -181,7 +210,10 @@ async function showMenuList(ctx: Context, user: TelegramCustomer, requestedPage:
     keyboard.row()
   }
   keyboard.text('Cancel', 'o:cancel')
-  return respond(ctx, editing, 'Silakan pilih menu yang ingin kakak pesan 😊\n\nKakak juga bisa cek keranjang sementara dengan /carts.', keyboard)
+  if (editing) return edit(ctx, 'Silakan pilih menu yang ingin kakak pesan 😊\n\nKakak juga bisa cek keranjang sementara dengan /carts.', keyboard)
+  const sent = await reply(ctx, 'Silakan pilih menu yang ingin kakak pesan 😊\n\nKakak juga bisa cek keranjang sementara dengan /carts.', keyboard)
+  if (sent) await prisma.customer.update({ where: { telegramUserId: user.id }, data: { activeOrderMessageId: BigInt(sent.message_id) } })
+  return sent
 }
 
 async function showMenu(ctx: Context, _user: TelegramCustomer, menuId: number, page: number, editing: boolean) {
@@ -199,34 +231,36 @@ async function showMenu(ctx: Context, _user: TelegramCustomer, menuId: number, p
 async function showQuantity(ctx: Context, user: TelegramCustomer, variantId: number, page: number) {
   const capacity = await maxAddableQuantity(user.id, variantId)
   if (!capacity) throw new BotBusinessError('STOCK_INSUFFICIENT', 'Stock untuk menu ini sudah habis atau tidak cukup.')
-  if (capacity === 1) return showAddons(ctx, user, variantId, 1, page)
-  const variant = await prisma.menuVariant.findUniqueOrThrow({ where: { id: variantId }, include: { menu: true } })
+  const variant = await prisma.menuVariant.findUniqueOrThrow({ where: { id: variantId }, include: { menu: true, stockUsages: { include: { stockItem: true } } } })
   const keyboard = new InlineKeyboard()
   for (let qty = 1; qty <= Math.min(3, capacity); qty++) keyboard.text(`Add ${qty}`, `o:q:${variantId}:${qty}:${page}`).row()
   keyboard.text('Back', `o:m:${variant.menuId}:${page}`).row().text('Cancel', 'o:cancel')
-  return edit(ctx, `${variant.menu.name}\n${visibleVariantName(variant.name) ? `Varian: ${variant.name}\n` : ''}Harga: ${money(variant.price)}\n\nPilih jumlah yang ingin ditambahkan.`, keyboard)
+  const contents = variant.stockUsages.map((usage) => `${usage.quantity}${usage.stockItem.unit ? ` ${usage.stockItem.unit}` : ''} ${usage.stockItem.name}`)
+  const contentText = contents.length === 1 ? `Isi: ${contents[0]}\n` : contents.length > 1 ? `Isi:\n${contents.map((item) => `- ${item}`).join('\n')}\n` : ''
+  return edit(ctx, `${variant.menu.name}\n${visibleVariantName(variant.name) ? `Varian: ${variant.name}\n` : ''}${contentText}Harga: ${money(variant.price)}\n\nPilih jumlah yang ingin ditambahkan.`, keyboard)
 }
 
 async function showAddons(ctx: Context, _user: TelegramCustomer, variantId: number, qty: number, page: number) {
   const variant = await prisma.menuVariant.findUniqueOrThrow({ where: { id: variantId }, include: { menu: true } })
-  const links = await prisma.menuAddon.findMany({ where: { menuId: variant.menuId, isActive: true }, include: { addonMenu: { include: { variants: { where: { isActive: true }, orderBy: { id: 'asc' } } } } }, orderBy: { sortOrder: 'asc' } })
+  const freeAddons = await listAutomaticFreeAddonVariants(variant.menuId)
+  const links = await prisma.menuAddon.findMany({ where: { menuId: variant.menuId, isActive: true, isFree: false }, include: { addonMenu: { include: { variants: { where: { isActive: true }, orderBy: { id: 'asc' } } } } }, orderBy: { sortOrder: 'asc' } })
   const valid = links.filter((link) => link.addonMenu.isActive && link.addonMenu.variants.length)
   if (!valid.length) return showAddConfirmation(ctx, variantId, qty, 0, page)
   const keyboard = new InlineKeyboard()
   const options = new Map<number, { link: typeof valid[number]; variant: typeof valid[number]['addonMenu']['variants'][number] }>()
-  for (const link of valid) for (const addonVariant of link.addonMenu.variants) {
-    const current = options.get(addonVariant.id)
-    if (!current || link.isFree) options.set(addonVariant.id, { link, variant: addonVariant })
-  }
-  for (const { link, variant: addonVariant } of options.values()) keyboard.text(`${link.addonMenu.name}${visibleVariantName(addonVariant.name) ? ` ${addonVariant.name}` : ''} - ${link.isFree ? 'Gratis' : money(addonVariant.price)}`, `o:cf:${variantId}:${qty}:${addonVariant.id}:${page}`).row()
+  for (const link of valid) for (const addonVariant of link.addonMenu.variants) options.set(addonVariant.id, { link, variant: addonVariant })
+  for (const { link, variant: addonVariant } of options.values()) keyboard.text(`${link.addonMenu.name}${visibleVariantName(addonVariant.name) ? ` ${addonVariant.name}` : ''} - ${money(addonVariant.price)}`, `o:cf:${variantId}:${qty}:${addonVariant.id}:${page}`).row()
   keyboard.text('Skip add-on', `o:cf:${variantId}:${qty}:0:${page}`).row().text('Back to menu', `o:p:${page}`).row().text('Cancel', 'o:cancel')
-  return edit(ctx, `Mau tambah pelengkap untuk menu ini, kak?\n\n${variant.menu.name} x${qty}\n\nKalau tidak perlu tambahan, kakak bisa pilih Skip add-on.`, keyboard)
+  const selection = [`- ${variant.menu.name} x${qty}`, ...freeAddons.map((addon) => `- ${addon.menu.name} x${qty} (Free)`)]
+  return edit(ctx, `Mau tambah pelengkap untuk menu ini, kak?\n\n${selection.join('\n')}\n\nKalau tidak perlu tambahan, kakak bisa pilih Skip add-on.`, keyboard)
 }
 
 async function showAddConfirmation(ctx: Context, variantId: number, qty: number, addonVariantId: number, page: number) {
   const variant = await prisma.menuVariant.findUniqueOrThrow({ where: { id: variantId }, include: { menu: true } })
+  const freeAddons = await listAutomaticFreeAddonVariants(variant.menuId)
   const addon = addonVariantId ? await prisma.menuVariant.findUnique({ where: { id: addonVariantId }, include: { menu: true } }) : null
-  const text = [`Berikut yang akan ditambahkan ke keranjang:`, '', `${variant.menu.name}${visibleVariantName(variant.name) ? ` (${variant.name})` : ''} x${qty}`, addon ? `Add-on: ${addon.menu.name}${visibleVariantName(addon.name) ? ` (${addon.name})` : ''} x${qty}` : 'Tanpa add-on', '', 'Mau tambahkan ke cart, kak?'].join('\n')
+  const freeLines = freeAddons.map((item) => `${item.menu.name}${visibleVariantName(item.name) ? ` (${item.name})` : ''} x${qty} (Free)`)
+  const text = [`Berikut yang akan ditambahkan ke keranjang:`, '', `${variant.menu.name}${visibleVariantName(variant.name) ? ` (${variant.name})` : ''} x${qty}`, ...freeLines, addon ? `Add-on: ${addon.menu.name}${visibleVariantName(addon.name) ? ` (${addon.name})` : ''} x${qty}` : 'Tanpa add-on berbayar', '', 'Mau tambahkan ke cart, kak?'].join('\n')
   const keyboard = new InlineKeyboard().text('Add to cart', `o:add:${variantId}:${qty}:${addonVariantId}:${page}`).row().text('Choose different add-on', `o:q:${variantId}:${qty}:${page}`).row().text('Back to menu', `o:p:${page}`).row().text('Cancel', 'o:cancel')
   return edit(ctx, text, keyboard)
 }
@@ -300,6 +334,30 @@ async function showOrderDetail(ctx: Context, user: TelegramCustomer, orderId: nu
   if (order.orderStatus === 'completed') keyboard.text('Reorder', `mo:reorder:${order.id}:${page}`).row()
   keyboard.text('Back', `mo:p:${page}`).text('Refresh', `mo:d:${order.id}:${page}`)
   return respond(ctx, editing, lines.join('\n'), keyboard)
+}
+
+async function cancelActiveOrderMessage(ctx: Context) {
+  if (!ctx.chat || !ctx.from) return
+  const telegramUserId = BigInt(ctx.from.id)
+  const customer = await prisma.customer.findUnique({ where: { telegramUserId }, select: { activeOrderMessageId: true } })
+  if (!customer?.activeOrderMessageId) return
+  const messageId = Number(customer.activeOrderMessageId)
+  try {
+    await ctx.api.deleteMessage(ctx.chat.id, messageId)
+  } catch {
+    const options = { parse_mode: 'HTML' as const, reply_markup: { inline_keyboard: [] } }
+    try {
+      await ctx.api.editMessageText(ctx.chat.id, messageId, '<i>Pesan ini dibatalkan</i>', options)
+    } catch {
+      await ctx.api.editMessageCaption(ctx.chat.id, messageId, { caption: '<i>Pesan ini dibatalkan</i>', ...options }).catch(() => undefined)
+    }
+  } finally {
+    await clearActiveOrderMessage(telegramUserId)
+  }
+}
+
+async function clearActiveOrderMessage(telegramUserId: bigint) {
+  await prisma.customer.updateMany({ where: { telegramUserId }, data: { activeOrderMessageId: null } })
 }
 
 async function guarded(ctx: Context, action: (user: TelegramCustomer) => Promise<unknown>) {

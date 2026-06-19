@@ -41,6 +41,7 @@ model Customer {
   blockedBy       User?     @relation("CustomerBlockedBy", fields: [blockedById], references: [id])
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
+  activeOrderMessageId BigInt? @map("active_order_message_id")
 
   messages        BotMessage[]
 
