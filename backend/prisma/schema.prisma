@@ -141,6 +141,7 @@ model Menu {
   variants     MenuVariant[]
   addonLinks   MenuAddon[]   @relation("MenuToAddon")    // add-on yang dipasang ke menu ini
   asAddonLinks MenuAddon[]   @relation("AddonMenu")      // menu ini dipakai sbg add-on di mana
+  cartItems    CartItem[]
 
   @@index([isActive])
   @@map("menus")
@@ -158,6 +159,7 @@ model MenuVariant {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   stockUsages MenuVariantStockUsage[]
+  cartItems   CartItem[]
 
   @@index([menuId])
   @@index([isActive])
@@ -213,6 +215,7 @@ model PreOrder {
 
   orders   Order[]
   messages BotMessage[]
+  reminderLogs PreOrderReminderLog[]
 
   @@index([status])
   @@map("pre_orders")
@@ -269,10 +272,49 @@ model OrderItem {
   sortOrder           Int      @default(0) @map("sort_order")
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
+  stockUsages         OrderItemStockUsage[]
 
   @@index([orderId])
   @@index([parentOrderItemId])
   @@map("order_items")
+}
+
+/// Snapshot pemakaian stock saat checkout agar pembatalan dapat mengembalikan
+/// jumlah yang tepat walau mapping menu berubah setelah order dibuat.
+model OrderItemStockUsage {
+  id          Int       @id @default(autoincrement())
+  orderItemId Int       @map("order_item_id")
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id])
+  stockItemId Int       @map("stock_item_id")
+  quantity    Int
+
+  @@index([orderItemId])
+  @@index([stockItemId])
+  @@map("order_item_stock_usages")
+}
+
+/// Keranjang customer. Add-on menunjuk item utama melalui parentCartItemId.
+model CartItem {
+  id                 Int         @id @default(autoincrement())
+  telegramUserId     BigInt      @map("telegram_user_id")
+  parentCartItemId   Int?        @map("parent_cart_item_id")
+  itemType           String      @default("main") @map("item_type")
+  menuId             Int         @map("menu_id")
+  menu                Menu        @relation(fields: [menuId], references: [id])
+  menuVariantId      Int         @map("menu_variant_id")
+  variant             MenuVariant @relation(fields: [menuVariantId], references: [id])
+  menuNameSnapshot   String      @map("menu_name_snapshot")
+  variantNameSnapshot String?    @map("variant_name_snapshot")
+  unitPrice          Int         @map("unit_price")
+  quantity           Int
+  createdAt          DateTime    @default(now()) @map("created_at")
+  updatedAt          DateTime    @updatedAt @map("updated_at")
+
+  @@index([telegramUserId])
+  @@index([parentCartItemId])
+  @@index([menuId])
+  @@index([menuVariantId])
+  @@map("cart_items")
 }
 
 /// [SHARED] Subscriber reminder pre-order.
@@ -287,6 +329,21 @@ model ReminderSubscriber {
 
   @@index([isActive])
   @@map("pre_order_reminder_subscribers")
+}
+
+/// Delivery log reminder per subscriber/pre-order untuk mencegah pengiriman ganda.
+model PreOrderReminderLog {
+  id                 Int      @id @default(autoincrement())
+  preOrderId         Int      @map("pre_order_id")
+  preOrder           PreOrder @relation(fields: [preOrderId], references: [id])
+  telegramUserId     BigInt   @map("telegram_user_id")
+  status             String   @default("sent")
+  errorMessage       String?  @map("error_message")
+  sentAt             DateTime @default(now()) @map("sent_at")
+
+  @@unique([preOrderId, telegramUserId])
+  @@index([telegramUserId])
+  @@map("pre_order_reminder_logs")
 }
 
 /// [EXTEND] Konfigurasi bot. CMS menambah description + inputType + sortOrder.

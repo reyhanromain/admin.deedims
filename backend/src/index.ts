@@ -17,7 +17,20 @@ async function main() {
   // Bot Telegram (kalau token ada)
   const bot = createBot()
   if (bot) {
-    void bot.start({ onStart: (info) => app.log.info(`Bot @${info.username} aktif`) })
+    void bot.start({
+      onStart: async (info) => {
+        await bot.api.deleteWebhook({ drop_pending_updates: false })
+        await bot.api.setMyCommands([
+          { command: 'start', description: 'Cek status pre-order' },
+          { command: 'order', description: 'Pilih menu dan mulai pesan' },
+          { command: 'carts', description: 'Lihat keranjang dan checkout' },
+          { command: 'my_orders', description: 'Lihat status dan histori order' },
+          { command: 'remind_preorder', description: 'Aktifkan reminder pre-order' },
+          { command: 'stop_preorder_reminder', description: 'Matikan reminder pre-order' },
+        ])
+        app.log.info(`Bot @${info.username} aktif`)
+      },
+    }).catch((error) => app.log.error(error, 'Bot Telegram gagal dijalankan'))
   } else {
     app.log.warn('BOT_TOKEN kosong — bot tidak dijalankan (mode API-only)')
   }

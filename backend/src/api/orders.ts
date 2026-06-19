@@ -4,6 +4,8 @@ import { prisma } from '../db'
 import { HttpError, ok, pageMeta } from '../lib/http'
 import { parsePage } from '../lib/paginate'
 import { itemsSummary } from '../lib/itemsSummary'
+import { approveOrderCancellation, BotBusinessError, cancelOrderByAdmin } from '../bot/service'
+import { notifyOrderStatus } from '../bot/notifications'
 
 const patchSchema = z.object({
   orderStatus: z.enum(['submitted', 'confirmed', 'ready', 'completed', 'cancelled']).optional(),
@@ -73,21 +75,24 @@ export async function ordersRoutes(app: FastifyInstance) {
     if (parsed.data.orderStatus === 'confirmed') data.confirmedAt = new Date()
     if (parsed.data.orderStatus === 'cancelled') data.cancelledAt = new Date()
 
-    const u = await prisma.order.update({ where: { id: idOf(req) }, data })
+    const id = idOf(req)
+    const u = parsed.data.orderStatus === 'cancelled'
+      ? await cancelOrderByAdmin(id)
+      : await prisma.order.update({ where: { id }, data })
+    if (parsed.data.orderStatus) await notifyOrderStatus(u.id, 'status')
     return ok({ id: u.id, status: u.orderStatus, pay: u.paymentStatus, adminNotes: u.adminNotes ?? '', cancelRequested: u.cancelRequested, updatedAt: u.updatedAt })
   })
 
   // POST /api/orders/:id/cancellation/approve
   app.post('/:id/cancellation/approve', async (req) => {
     const id = idOf(req)
-    const pending = await prisma.orderCancellationRequest.findFirst({ where: { orderId: id, status: 'pending' } })
-    if (!pending) throw new HttpError(404, 'Tidak ada permintaan pembatalan pending', 'NOT_FOUND')
-
-    const now = new Date()
-    await prisma.$transaction([
-      prisma.orderCancellationRequest.update({ where: { id: pending.id }, data: { status: 'approved', reviewedById: req.user.id, reviewedAt: now } }),
-      prisma.order.update({ where: { id }, data: { orderStatus: 'cancelled', paymentStatus: 'cancelled', cancelRequested: false, cancelledAt: now } }),
-    ])
+    try {
+      await approveOrderCancellation(id, req.user.id)
+    } catch (error) {
+      if (error instanceof BotBusinessError && error.code === 'CANCELLATION_NOT_FOUND') throw new HttpError(404, error.message, 'NOT_FOUND')
+      throw error
+    }
+    await notifyOrderStatus(id, 'cancel_approved')
     return ok({ status: 'approved' })
   })
 
@@ -102,6 +107,7 @@ export async function ordersRoutes(app: FastifyInstance) {
       prisma.orderCancellationRequest.update({ where: { id: pending.id }, data: { status: 'rejected', reviewedById: req.user.id, reviewedAt: now } }),
       prisma.order.update({ where: { id }, data: { cancelRequested: false } }),
     ])
+    await notifyOrderStatus(id, 'cancel_rejected')
     return ok({ status: 'rejected' })
   })
 }

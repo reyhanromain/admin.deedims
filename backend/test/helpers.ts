@@ -14,6 +14,9 @@ export async function makeApp(): Promise<FastifyInstance> {
 /** Kosongkan semua tabel (urutan anak → induk) lalu isi fixture. */
 export async function resetDb() {
   await prisma.botMessage.deleteMany()
+  await prisma.cartItem.deleteMany()
+  await prisma.preOrderReminderLog.deleteMany()
+  await prisma.orderItemStockUsage.deleteMany()
   await prisma.orderItem.deleteMany()
   await prisma.orderCancellationRequest.deleteMany()
   await prisma.order.deleteMany()

@@ -42,6 +42,17 @@ Set `BOT_TOKEN` (dan sebaiknya `JWT_SECRET`) lewat environment untuk mengaktifka
 BOT_TOKEN=123:abc JWT_SECRET=ganti-ini docker compose up --build
 ```
 
+Command customer yang tersedia:
+
+- `/start` — status pre-order dan ketersediaan menu
+- `/remind_preorder` / `/stop_preorder_reminder` — langganan reminder
+- `/order` — pilih menu, varian, quantity, dan add-on
+- `/carts` — lihat/edit cart dan checkout COD
+- `/my_orders` — histori, detail, cancel/request cancel, dan reorder
+
+Pembukaan pre-order dari CMS mengirim reminder idempotent. Perubahan status order dan hasil
+review cancellation juga dikirim ke customer ketika bot aktif.
+
 ## Jalankan lokal (dev)
 
 ```bash
@@ -69,7 +80,7 @@ salin juga file upload terkait agar foto menu tetap tampil.
 ## Test
 
 ```bash
-cd backend && npm test    # 64 test: integration (app.inject + SQLite test) + unit
+cd backend && npm test    # 89 test: integration (API + bot + SQLite test) + unit
 cd frontend && npm test   # 27 test: mappers (pure) + store/lazy-load (api di-mock, jsdom)
 ```
 

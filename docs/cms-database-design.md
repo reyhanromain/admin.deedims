@@ -490,11 +490,18 @@ diisi.
 
 ---
 
-## 8. Langkah berikutnya (usulan)
+## 8. Model operasional customer bot
 
-1. Anda review schema ini.
-2. Inisialisasi Prisma (`prisma init` + `DATABASE_URL` ke file SQLite), masukkan `schema.prisma`.
-3. Karena DB dipakai bersama bot, sepakati siapa "pemilik" migrasi tiap tabel shared (hindari dua
-   sumber migrasi yang bentrok). Tabel `[NEW]`/`[EXTEND]` di-drive oleh CMS.
-4. Ganti store CMS yang sekarang in-memory dengan Prisma Client (baca/tulis nyata) + endpoint API
-   ringan untuk auth JWT.
+Implementasi customer bot menambahkan tiga model pada schema bersama:
+
+- `CartItem` menyimpan main item dan add-on sementara per `telegramUserId`. Add-on menunjuk main
+  item melalui `parentCartItemId`; quantity add-on mengikuti main item.
+- `OrderItemStockUsage` menyimpan snapshot stock yang benar-benar dipotong saat checkout. Snapshot
+  ini digunakan untuk mengembalikan stock secara tepat ketika order dibatalkan, walaupun mapping
+  stock menu sudah berubah.
+- `PreOrderReminderLog` menyimpan hasil delivery unik per pasangan pre-order/subscriber agar
+  reminder pembukaan pre-order tidak terkirim dua kali dan kegagalan dapat dicoba ulang.
+
+Checkout customer berjalan dalam satu transaksi: validasi ulang cart dan harga terkini, membuat
+order beserta snapshot item/stock, mengurangi stock secara kondisional, lalu menghapus cart. Semua
+operasi memakai Prisma Client dan SQLite yang sama dengan CMS.

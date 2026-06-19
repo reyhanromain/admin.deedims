@@ -1,0 +1,110 @@
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { createBot } from '../src/bot'
+import { registerTelegramSender } from '../src/bot/notifications'
+import { prisma, resetDb } from './helpers'
+
+beforeEach(resetDb)
+afterEach(() => registerTelegramSender(null))
+
+function testBot() {
+  const bot = createBot('123456:test-token')!
+  const sent: Array<{ method: string; payload: Record<string, unknown> }> = []
+  bot.api.config.use(async (_previous, method, payload) => {
+    sent.push({ method, payload: payload as Record<string, unknown> })
+    if (method === 'getMe') return { ok: true, result: { id: 123456, is_bot: true, first_name: 'Deedims', username: 'deedims_test_bot' } } as any
+    if (method === 'sendMessage') return {
+      ok: true,
+      result: {
+        message_id: sent.length,
+        date: Math.floor(Date.now() / 1000),
+        chat: { id: Number(payload.chat_id), type: 'private', first_name: 'Budi' },
+        text: payload.text,
+      },
+    } as any
+    if (method === 'answerCallbackQuery' || method === 'editMessageText') return { ok: true, result: true } as any
+    throw new Error(`Unexpected Telegram API method: ${method}`)
+  })
+  return { bot, sent }
+}
+
+function messageUpdate(text: string, messageId = 1) {
+  return {
+    update_id: messageId,
+    message: {
+      message_id: messageId,
+      date: Math.floor(Date.now() / 1000),
+      chat: { id: 222, type: 'private' as const, first_name: 'Budi' },
+      from: { id: 222, is_bot: false, first_name: 'Budi', username: 'budi' },
+      text,
+      entities: text.startsWith('/') ? [{ offset: 0, length: text.length, type: 'bot_command' as const }] : undefined,
+    },
+  }
+}
+
+function callbackUpdate(data: string, updateId: number) {
+  return {
+    update_id: updateId,
+    callback_query: {
+      id: `callback-${updateId}`,
+      chat_instance: 'test',
+      from: { id: 222, is_bot: false, first_name: 'Budi', username: 'budi' },
+      data,
+      message: {
+        message_id: 10,
+        date: Math.floor(Date.now() / 1000),
+        chat: { id: 222, type: 'private' as const, first_name: 'Budi' },
+        from: { id: 123456, is_bot: true, first_name: 'Deedims', username: 'deedims_test_bot' },
+        text: 'menu',
+      },
+    },
+  }
+}
+
+describe('grammY customer handlers', () => {
+  it('/start membaca availability dan mencatat incoming/outgoing', async () => {
+    const { bot, sent } = testBot()
+    await bot.init()
+    await bot.handleUpdate(messageUpdate('/start'))
+
+    const response = sent.find((call) => call.method === 'sendMessage')?.payload.text
+    expect(response).toContain('Pre-order sedang dibuka')
+    expect(await prisma.customer.findUnique({ where: { telegramUserId: 222n } })).toMatchObject({ username: 'budi', name: 'Budi' })
+    expect(await prisma.botMessage.count({ where: { telegramUserId: 222n, direction: 'incoming' } })).toBe(1)
+    expect(await prisma.botMessage.count({ where: { telegramUserId: 222n, direction: 'outgoing' } })).toBe(1)
+  })
+
+  it('/order mengirim inline menu dan unknown text mendapat fallback', async () => {
+    const { bot, sent } = testBot()
+    await bot.init()
+    await bot.handleUpdate(messageUpdate('/order'))
+    await bot.handleUpdate(messageUpdate('halo?', 2))
+
+    const messages = sent.filter((call) => call.method === 'sendMessage').map((call) => call.payload)
+    expect(messages[0].text).toContain('Silakan pilih menu')
+    expect(JSON.stringify(messages[0].reply_markup)).toContain('Menu A')
+    expect(messages[1].text).toContain('belum dikenali')
+  })
+
+  it('subscribe reminder melalui command bersifat idempotent', async () => {
+    const { bot, sent } = testBot()
+    await bot.init()
+    await bot.handleUpdate(messageUpdate('/remind_preorder'))
+    await bot.handleUpdate(messageUpdate('/remind_preorder', 2))
+
+    expect(await prisma.reminderSubscriber.findUnique({ where: { telegramUserId: 222n } })).toMatchObject({ isActive: true })
+    const texts = sent.filter((call) => call.method === 'sendMessage').map((call) => String(call.payload.text))
+    expect(texts[0]).toContain('akan dikabari')
+    expect(texts[1]).toContain('sudah masuk list')
+  })
+
+  it('callback add-to-cart membawa selection stateless dan menulis cart', async () => {
+    const { bot, sent } = testBot()
+    await bot.init()
+    const variant = await prisma.menuVariant.findFirstOrThrow({ where: { menuId: 1 } })
+    await bot.handleUpdate(messageUpdate('/order'))
+    await bot.handleUpdate(callbackUpdate(`o:add:${variant.id}:2:0:1`, 2))
+
+    expect(await prisma.cartItem.findFirst({ where: { telegramUserId: 222n } })).toMatchObject({ menuVariantId: variant.id, quantity: 2 })
+    expect(sent.some((call) => call.method === 'editMessageText' && String(call.payload.text).includes('Berhasil ditambahkan'))).toBe(true)
+  })
+})

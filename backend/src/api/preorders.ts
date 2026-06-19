@@ -4,6 +4,7 @@ import { prisma } from '../db'
 import { HttpError, ok, pageMeta } from '../lib/http'
 import { parsePage } from '../lib/paginate'
 import { itemsSummary } from '../lib/itemsSummary'
+import { dispatchPreOrderReminders } from '../bot/notifications'
 
 const idOf = (req: { params: unknown }) => Number((req.params as { id: string }).id)
 
@@ -80,6 +81,7 @@ export async function preordersRoutes(app: FastifyInstance) {
     const open = await prisma.preOrder.findFirst({ where: { status: 'open' } })
     if (open && open.id !== id) throw new HttpError(409, 'Tutup dulu PO yang sedang open — hanya boleh satu open', 'CONFLICT')
     const po = await prisma.preOrder.update({ where: { id }, data: { status: 'open', openedAt: new Date() } })
+    await dispatchPreOrderReminders(po.id)
     return ok({ id: po.id, status: po.status })
   })
 
