@@ -57,6 +57,26 @@ const menuSchema = z.object({
 
 type MenuInput = z.infer<typeof menuSchema>
 
+async function validateFreeAddons(data: MenuInput, editingId?: number) {
+  const freeAddonIds = Array.from(new Set(data.freeAddons))
+  if (!data.isAddon && freeAddonIds.length) {
+    const candidates = await prisma.menu.findMany({
+      where: { id: { in: freeAddonIds }, isAddon: true },
+      include: { variants: { where: { isActive: true } } },
+    })
+    const validIds = new Set(candidates.filter((menu) => menu.variants.length === 1).map((menu) => menu.id))
+    if (freeAddonIds.some((id) => !validIds.has(id))) {
+      throw new HttpError(400, 'Menu pelengkap gratis harus memiliki tepat satu varian aktif.', 'FREE_ADDON_VARIANT_INVALID')
+    }
+  }
+  if (editingId) {
+    const freeReferences = await prisma.menuAddon.count({ where: { addonMenuId: editingId, isFree: true, isActive: true } })
+    if (freeReferences && (!data.isAddon || data.variants.length !== 1)) {
+      throw new HttpError(400, 'Menu ini dipakai sebagai pelengkap gratis dan harus memiliki tepat satu varian aktif.', 'FREE_ADDON_VARIANT_INVALID')
+    }
+  }
+}
+
 async function writeChildren(tx: Prisma.TransactionClient, menuId: number, data: MenuInput) {
   for (const v of data.variants) {
     await tx.menuVariant.create({
@@ -103,6 +123,7 @@ export async function menusRoutes(app: FastifyInstance) {
     const parsed = menuSchema.safeParse(req.body)
     if (!parsed.success) throw new HttpError(400, 'Invalid payload', 'VALIDATION')
     const d = parsed.data
+    await validateFreeAddons(d)
 
     const id = await prisma.$transaction(async (tx) => {
       const created = await tx.menu.create({
@@ -129,6 +150,7 @@ export async function menusRoutes(app: FastifyInstance) {
 
     const exists = await prisma.menu.findUnique({ where: { id } })
     if (!exists) throw new HttpError(404, 'Menu tidak ditemukan', 'NOT_FOUND')
+    await validateFreeAddons(d, id)
 
     await prisma.$transaction(async (tx) => {
       // Ganti foto → cache telegram_file_id basi (kecuali dikirim eksplisit).
