@@ -55,6 +55,7 @@ git pull --ff-only origin "$expected_branch"
 
 echo 'Running backend verification...'
 npm --prefix backend ci
+npm --prefix backend run prisma:generate
 npm --prefix backend run typecheck
 npm --prefix backend test
 
