@@ -1,12 +1,18 @@
 # Git Versioning Workflow
 
-Deedims uses a trunk-based Git flow with short-lived branches, Conventional Commits, and one SemVer product version for the full deployable app.
+Deedims uses two long-lived branches and short-lived change branches. `main` is
+the production baseline, while `dev` is the shared integration and testing
+environment.
 
-## Branches
+## Branch Roles
 
-- `main` is the only long-lived branch. It should always be deployable.
-- Work happens in short-lived branches named `<type>/<short-description>`.
-- Use release branches only when a version needs stabilization after feature work is frozen.
+- `main`: production-ready code and the source of every new change branch.
+- `dev`: integration branch for testing completed changes before production.
+- `<type>/<short-description>`: one short-lived branch for one change. Keep this
+  branch until it has been merged into both `dev` and `main`.
+
+Never develop directly on `main` or `dev`. Do not merge `dev` into `main`,
+because that can release other changes that have not finished testing.
 
 Branch prefixes:
 
@@ -16,16 +22,48 @@ Branch prefixes:
 - `test/` for test-only changes.
 - `refactor/` for behavior-preserving code changes.
 - `chore/` for maintenance, tooling, dependencies, and releases.
-- `release/` for release stabilization, for example `release/2.1.0`.
-- `hotfix/` for urgent fixes from the current production tag.
+- `hotfix/` for urgent production fixes.
 
-Examples:
+## Change Flow
+
+1. Update `main`, then create a branch from it.
 
 ```bash
 git switch main
-git pull --ff-only
+git pull --ff-only origin main
 git switch -c feat/preorder-cancellation-report
 ```
+
+2. Implement and verify the change, then push the branch.
+
+```bash
+git push -u origin feat/preorder-cancellation-report
+```
+
+3. Open a PR from the change branch to `dev`. Merge it with a **merge commit**.
+   Do not squash, rebase-merge, or delete the branch yet. This preserves the
+   exact tested commit for the production gate.
+
+4. Test the integrated application on `dev`.
+
+5. If testing passes, open a second PR from the same change branch directly to
+   `main`. Merge it, then delete the change branch.
+
+6. Synchronize `dev` after the production merge if GitHub reports branch
+   divergence. Use a PR from `main` to `dev`; never rewrite either long-lived
+   branch.
+
+If a fix is required during `dev` testing, commit it to the same change branch,
+merge that updated branch into `dev` again, and repeat testing. The PR to `main`
+must contain the same final head commit already merged into `dev`.
+
+The repository workflow validates these rules automatically:
+
+- PRs to `dev` and `main` must come from a short-lived change branch.
+- The change branch must contain the current `main` baseline before entering
+  `dev`.
+- The exact change-branch head must already exist in `dev` before it can enter
+  `main`.
 
 ## Commits
 
@@ -35,14 +73,7 @@ Use Conventional Commits:
 <type>(optional-scope): <short imperative summary>
 ```
 
-Accepted types:
-
-- `feat`: adds user-facing behavior.
-- `fix`: corrects broken behavior.
-- `docs`: documentation only.
-- `test`: tests only.
-- `refactor`: behavior-preserving code changes.
-- `chore`: tooling, release, dependency, or maintenance work.
+Accepted types are `feat`, `fix`, `docs`, `test`, `refactor`, and `chore`.
 
 Examples:
 
@@ -53,12 +84,9 @@ docs(release): document version workflow
 chore(release): v2.0.1
 ```
 
-Commit rules:
-
-- Keep commits reviewable and scoped to one reason for change.
-- Do not mix schema changes, API changes, and UI changes unless the feature requires one atomic change.
-- Add a body when the reason or migration impact is not obvious.
-- Mark breaking changes with `BREAKING CHANGE:` in the footer.
+Keep commits scoped to one reason for change. Add a body when the reason or
+migration impact is not obvious, and mark breaking changes with
+`BREAKING CHANGE:` in the footer.
 
 Optional local setup:
 
@@ -68,18 +96,21 @@ git config commit.template .gitmessage
 
 ## Pull Requests
 
-Every PR should include:
+Every PR must include:
 
+- Target stage: integration into `dev` or production promotion into `main`.
 - Summary of behavior or workflow changed.
-- Verification commands run.
+- Verification commands and integration-test evidence.
 - Schema, seed, environment, Docker, or deployment impacts.
 - Screenshots for CMS UI changes.
 
-Recommended PR merge style is squash merge. The squash title should be a valid Conventional Commit.
+Use merge commits for change branches entering `dev`. The final merge to
+`main` may also use a merge commit so the same branch history remains visible.
 
 ## Versioning
 
-Use one product version for the full monorepo because the backend, bot, database, and frontend deploy together.
+Use one SemVer product version for the full monorepo because the backend, bot,
+database, and frontend deploy together.
 
 Version sources that must stay in sync:
 
@@ -92,77 +123,43 @@ Version sources that must stay in sync:
 
 SemVer bump rules:
 
-- Patch: compatible bug fixes, security fixes, copy changes, small operational fixes.
-- Minor: backward-compatible features, new admin workflows, new bot flows, additive API changes.
-- Major: breaking API changes, destructive schema migrations, incompatible environment changes, or user-visible workflow replacements.
+- Patch: compatible bug fixes, security fixes, copy changes, and small
+  operational fixes.
+- Minor: backward-compatible features, new admin or bot flows, and additive API
+  changes.
+- Major: breaking API changes, destructive schema migrations, incompatible
+  environment changes, or user-visible workflow replacements.
 
-Pre-1.0 semantics are not used for this repository from this baseline onward. The current baseline is `2.0.0`.
+The current baseline is `2.0.0`.
 
 ## Release Flow
 
-1. Start from a clean `main`.
+Prepare version and changelog changes on a `chore/release-X.Y.Z` branch created
+from `main`, then follow the normal change flow through `dev` and `main`.
+
+```bash
+npm --prefix backend version X.Y.Z --no-git-tag-version
+npm --prefix frontend version X.Y.Z --no-git-tag-version
+```
+
+After the release branch is merged into `main`, tag that merge commit:
 
 ```bash
 git switch main
-git pull --ff-only
-```
-
-2. Create the release branch.
-
-```bash
-git switch -c release/2.0.1
-```
-
-3. Update version files and changelog.
-
-```bash
-npm --prefix backend version 2.0.1 --no-git-tag-version
-npm --prefix frontend version 2.0.1 --no-git-tag-version
-printf '2.0.1\n' > VERSION
-```
-
-Add a new `CHANGELOG.md` section dated with the release date.
-
-4. Run verification.
-
-```bash
-cd backend && npm run typecheck && npm test
-cd ../frontend && npm run build && npm test
-```
-
-5. Commit the release branch.
-
-```bash
-git add VERSION CHANGELOG.md backend/package.json backend/package-lock.json frontend/package.json frontend/package-lock.json
-git commit -m "chore(release): v2.0.1"
-```
-
-6. Open a PR from `release/2.0.1` to `main`. Merge only after verification passes.
-
-7. Tag the merged commit on `main`.
-
-```bash
-git switch main
-git pull --ff-only
-git tag -a v2.0.1 -m "v2.0.1"
-git push origin main v2.0.1
+git pull --ff-only origin main
+git tag -a vX.Y.Z -m "vX.Y.Z"
+git push origin main vX.Y.Z
 ```
 
 ## Hotfix Flow
 
-Use this only for urgent production fixes.
-
-```bash
-git switch main
-git pull --ff-only
-git switch -c hotfix/<short-description>
-```
-
-After the fix is verified, release it as a patch version using the release flow.
+Create urgent fixes from `main` using `hotfix/<short-description>`. Verify them
+on `dev` and promote the same branch to `main` unless the production incident
+requires an explicitly approved emergency bypass.
 
 ## Required Verification Before Merge
 
-Run the checks affected by the change at minimum. For release branches, run all of them:
+Run the checks affected by the change at minimum. Run all checks for a release:
 
 ```bash
 cd backend && npm run typecheck && npm test

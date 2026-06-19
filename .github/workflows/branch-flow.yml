@@ -1,0 +1,64 @@
+name: Branch flow
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - edited
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate branch promotion
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the change branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Fetch long-lived branches
+        run: |
+          git fetch origin main:refs/remotes/origin/main
+          git fetch origin dev:refs/remotes/origin/dev
+
+      - name: Validate source and promotion order
+        env:
+          BASE_BRANCH: ${{ github.base_ref }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$HEAD_BRANCH" = "main" ] && [ "$BASE_BRANCH" = "dev" ]; then
+            echo "Allowing main to synchronize the dev baseline."
+            exit 0
+          fi
+
+          case "$HEAD_BRANCH" in
+            feat/*|fix/*|docs/*|test/*|refactor/*|chore/*|hotfix/*) ;;
+            *)
+              echo "PRs to $BASE_BRANCH must come from a short-lived change branch."
+              exit 1
+              ;;
+          esac
+
+          if [ "$BASE_BRANCH" = "dev" ]; then
+            git merge-base --is-ancestor origin/main "$HEAD_SHA" || {
+              echo "The change branch must contain the current main baseline."
+              exit 1
+            }
+          fi
+
+          if [ "$BASE_BRANCH" = "main" ]; then
+            git merge-base --is-ancestor "$HEAD_SHA" origin/dev || {
+              echo "The exact change-branch head must be merged and tested in dev first."
+              exit 1
+            }
+          fi

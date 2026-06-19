@@ -31,7 +31,7 @@ Use Vitest for both packages. Name tests `*.test.ts` or `*.test.tsx`. Backend in
 
 ## Commit & Pull Request Guidelines
 
-Git history is not available in this checkout, so use clear imperative commit subjects such as `Add preorder cancellation tests` or `Fix menu upload validation`. Pull requests should describe the change, list verification commands, link issues, and include screenshots for CMS UI changes. Call out schema, seed, environment, or Docker changes.
+Use Conventional Commits such as `feat(preorders): add cancellation tests` or `fix(menu): validate uploads`. Create every change branch from `main`, merge the completed branch into `dev` for integration testing, then merge that same tested branch directly into `main`. Keep the branch until both merges are complete; do not merge `dev` into `main`. Pull requests should describe the change, list verification commands, link issues, and include screenshots for CMS UI changes. Call out schema, seed, environment, or Docker changes. See `docs/versioning-workflow.md` for the full branch contract.
 
 ## Security & Configuration Tips
 
