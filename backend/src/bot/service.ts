@@ -189,6 +189,7 @@ export async function addToCart(input: AddCartInput) {
           telegramUserId: input.telegramUserId,
           parentCartItemId: parent.id,
           itemType: 'addon',
+          isFree: true,
           menuId: freeAddon.menuId,
           menuVariantId: freeAddon.id,
           menuNameSnapshot: freeAddon.menu.name,
@@ -201,8 +202,9 @@ export async function addToCart(input: AddCartInput) {
     if (addon) await tx.cartItem.create({
       data: {
         telegramUserId: input.telegramUserId,
-        parentCartItemId: parent.id,
-        itemType: 'addon',
+      parentCartItemId: parent.id,
+      itemType: 'addon',
+      isFree: false,
         menuId: addon.menuId,
         menuVariantId: addon.id,
         menuNameSnapshot: addon.menu.name,
@@ -364,11 +366,11 @@ async function validateCartRows(tx: Prisma.TransactionClient, rows: CartRow[]) {
     }
     if (row.itemType === 'addon') {
       const parent = rows.find((candidate) => candidate.id === row.parentCartItemId && candidate.itemType === 'main')
-      const link = parent ? await tx.menuAddon.findFirst({ where: { menuId: parent.menuId, addonMenuId: row.menuId, isActive: true }, orderBy: { isFree: 'desc' } }) : null
+      const link = parent ? await tx.menuAddon.findFirst({ where: { menuId: parent.menuId, addonMenuId: row.menuId, isActive: true, isFree: row.isFree } }) : null
       if (!parent || !mainMenuIds.has(parent.menuId) || !link) {
         throw new BotBusinessError('CART_INVALID', `Add-on ${row.menuNameSnapshot} sudah tidak berlaku.`)
       }
-      effectivePrices.set(row.id, link.isFree ? 0 : row.variant.price)
+      effectivePrices.set(row.id, row.isFree ? 0 : row.variant.price)
     } else {
       effectivePrices.set(row.id, row.variant.price)
     }

@@ -300,6 +300,7 @@ model CartItem {
   telegramUserId     BigInt      @map("telegram_user_id")
   parentCartItemId   Int?        @map("parent_cart_item_id")
   itemType           String      @default("main") @map("item_type")
+  isFree             Boolean     @default(false) @map("is_free")
   menuId             Int         @map("menu_id")
   menu                Menu        @relation(fields: [menuId], references: [id])
   menuVariantId      Int         @map("menu_variant_id")
