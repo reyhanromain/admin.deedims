@@ -56,6 +56,7 @@ git pull --ff-only origin "$expected_branch"
 echo 'Running backend verification...'
 npm --prefix backend ci
 npm --prefix backend run prisma:generate
+test -s backend/node_modules/.prisma/client/default.d.ts
 npm --prefix backend run typecheck
 npm --prefix backend test
 
@@ -82,7 +83,7 @@ if [[ "$environment" == 'prod' ]] && "${compose[@]}" ps --services --status runn
     -v "$backup_dir:/backup" \
     alpine:3.22 sh -c 'tar -czf /backup/data.tar.gz -C /data . && cp /data/app.db /backup/app.db'
 
-  integrity="$(sqlite3 "$backup_dir/app.db" 'PRAGMA integrity_check;')"
+  integrity="$(sqlite3 -batch -noheader "$backup_dir/app.db" 'PRAGMA integrity_check;' | tail -1 | xargs)"
   if [[ "$integrity" != 'ok' ]]; then
     echo "Production database backup failed integrity check: $integrity" >&2
     exit 1
