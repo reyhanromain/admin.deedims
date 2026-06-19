@@ -64,9 +64,13 @@ describe('bot ordering domain', () => {
     const cart = await getCart(user.id)
     expect(cart.main[0].addons).toHaveLength(2)
     expect(cart.main[0].addons.map((item) => item.unitPrice)).toEqual([0, 5000])
+    expect(cart.main[0].addons.map((item) => item.isFree)).toEqual([true, false])
     expect(cart.main[0].addons.map((item) => item.quantity)).toEqual([2, 2])
     expect(cart.total).toBe(30000)
-    expect(await maxAddableQuantity(user.id, main.id)).toBe(1)
+    expect(await checkoutPreview(user.id)).toEqual({ total: 30000, priceChanged: false })
+    const order = await checkout(user)
+    expect(order.totalAmount).toBe(30000)
+    expect((await prisma.orderItem.findMany({ where: { orderId: order.id }, orderBy: { sortOrder: 'asc' } })).map((item) => item.unitPrice)).toEqual([10000, 0, 5000])
   })
 
   it('menu tidak orderable jika stock free complement tidak tersedia', async () => {

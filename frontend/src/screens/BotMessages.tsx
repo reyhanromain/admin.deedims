@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useAdmin } from '../store'
-import { getTheme, BRAND } from '../theme'
+import { getTheme, BRAND, poStatusBadge } from '../theme'
 import { cardStyle, inputStyle, labelStyle } from '../styles'
 import { Pill } from '../ui'
 import { Pager } from '../components/Pager'
@@ -90,6 +90,7 @@ function MessageBubble({ message: m }: { message: BotMessage }) {
   const t = getTheme(s.dark)
   const isMobile = useIsMobile()
   const incoming = m.direction === 'incoming'
+  const outgoingBadge = poStatusBadge(s.dark).open
   const author = incoming ? (m.customerName || m.telegramUsername || 'Customer') : 'Bot'
   const username = incoming && m.telegramUsername ? '@' + m.telegramUsername : ''
   const text = m.text || (m.command ? m.command : '[' + m.messageType + ']')
@@ -121,9 +122,14 @@ function MessageBubble({ message: m }: { message: BotMessage }) {
         </div>
 
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-          <Pill bg={incoming ? t.chipBg : (s.dark ? '#244836' : '#DDEDE4')} color={incoming ? t.chipColor : BRAND.bamboo}>
-            {incoming ? 'Incoming' : 'Outgoing'}
-          </Pill>
+          {incoming ? (
+            <Pill bg={t.chipBg} color={t.chipColor}>Incoming</Pill>
+          ) : (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: outgoingBadge.bg, color: outgoingBadge.color, borderRadius: 99, padding: '6px 14px', fontSize: 12.5, fontWeight: 700 }}>
+              <span style={{ width: 7, height: 7, borderRadius: 99, background: 'currentColor', display: 'inline-block' }} />
+              Outgoing
+            </span>
+          )}
           <span style={{ fontSize: 11.5, color: t.muted, fontWeight: 700 }}>{m.messageType}</span>
           {m.isCommand && m.command && (
             <span style={{ fontSize: 11.5, color: BRAND.terracotta, fontWeight: 800 }}>{m.command}</span>
