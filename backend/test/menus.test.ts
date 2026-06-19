@@ -74,6 +74,26 @@ describe('menus', () => {
     expect(links.map((x) => x.isFree)).toEqual([false, true])
   })
 
+  it('free add-on wajib memiliki tepat satu varian aktif', async () => {
+    await prisma.menuVariant.create({ data: { menuId: 2, name: 'Extra', price: 7000 } })
+    const res = await app.inject({
+      method: 'PATCH', url: '/api/menus/1', headers: authH(token),
+      payload: { name: 'Menu A', basePrice: 10000, variants: [{ name: 'Reg', price: 10000, stockId: 1, qty: 2 }], freeAddons: [2] },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(JSON.parse(res.body).error).toMatchObject({ code: 'FREE_ADDON_VARIANT_INVALID' })
+  })
+
+  it('pelengkap yang sedang dipakai sebagai free tidak boleh memiliki banyak varian', async () => {
+    await prisma.menuAddon.create({ data: { menuId: 1, addonMenuId: 2, isFree: true } })
+    const res = await app.inject({
+      method: 'PATCH', url: '/api/menus/2', headers: authH(token),
+      payload: { name: 'Addon B', basePrice: 5000, isAddon: true, variants: [{ name: 'A', price: 5000 }, { name: 'B', price: 6000 }] },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(JSON.parse(res.body).error).toMatchObject({ code: 'FREE_ADDON_VARIANT_INVALID' })
+  })
+
   it('toggle → data {id,isActive}', async () => {
     const res = await app.inject({ method: 'POST', url: '/api/menus/1/toggle', headers: authH(token) })
     expect(data(res)).toEqual({ id: 1, isActive: false })

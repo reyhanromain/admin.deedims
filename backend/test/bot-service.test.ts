@@ -54,6 +54,27 @@ describe('bot ordering domain', () => {
     expect(cart.total).toBe(30000)
   })
 
+  it('menambahkan free complement otomatis dan tetap mendukung paid add-on yang sama', async () => {
+    const { main, addon } = await variants()
+    await prisma.menuAddon.create({ data: { menuId: 1, addonMenuId: 2, isFree: true } })
+
+    expect(await maxAddableQuantity(user.id, main.id)).toBe(5)
+    await addToCart({ telegramUserId: user.id, variantId: main.id, addonVariantId: addon.id, quantity: 2 })
+
+    const cart = await getCart(user.id)
+    expect(cart.main[0].addons).toHaveLength(2)
+    expect(cart.main[0].addons.map((item) => item.unitPrice)).toEqual([0, 5000])
+    expect(cart.main[0].addons.map((item) => item.quantity)).toEqual([2, 2])
+    expect(cart.total).toBe(30000)
+    expect(await maxAddableQuantity(user.id, main.id)).toBe(1)
+  })
+
+  it('menu tidak orderable jika stock free complement tidak tersedia', async () => {
+    await prisma.menuAddon.create({ data: { menuId: 1, addonMenuId: 2, isFree: true } })
+    await prisma.stockItem.update({ where: { id: 2 }, data: { quantity: 0 } })
+    expect((await listOrderableMenus()).menus).toHaveLength(0)
+  })
+
   it('checkout atomik membuat order snapshot, mengurangi stock, dan mengosongkan cart', async () => {
     const { main, addon } = await variants()
     await addToCart({ telegramUserId: user.id, variantId: main.id, addonVariantId: addon.id, quantity: 2 })
@@ -68,9 +89,9 @@ describe('bot ordering domain', () => {
   })
 
   it('checkout menghitung ulang harga terkini dan tidak menagih add-on gratis', async () => {
-    const { main, addon } = await variants()
-    await prisma.menuAddon.updateMany({ where: { menuId: 1, addonMenuId: 2 }, data: { isFree: true } })
-    await addToCart({ telegramUserId: user.id, variantId: main.id, addonVariantId: addon.id, quantity: 1 })
+    const { main } = await variants()
+    await prisma.menuAddon.create({ data: { menuId: 1, addonMenuId: 2, isFree: true } })
+    await addToCart({ telegramUserId: user.id, variantId: main.id, quantity: 1 })
     expect((await getCart(user.id)).total).toBe(10000)
     await prisma.menuVariant.update({ where: { id: main.id }, data: { price: 12000 } })
     expect(await checkoutPreview(user.id)).toEqual({ total: 12000, priceChanged: true })
