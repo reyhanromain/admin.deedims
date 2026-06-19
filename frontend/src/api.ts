@@ -124,9 +124,9 @@ function fmtDay(iso: string | null | undefined): string {
 export const mapStock = (r: any): StockItem => ({ id: r.id, label: r.label, name: r.name, quantity: r.quantity, unit: r.unit ?? 'pcs' })
 
 export const mapMenu = (r: any): Menu => ({
-  id: r.id, name: r.name, description: r.description ?? '', basePrice: r.basePrice, active: r.isActive, isAddon: r.isAddon,
+  id: r.id, name: r.name, description: r.description ?? '', basePrice: r.basePrice, unitLabel: r.unitLabel ?? '', active: r.isActive, isAddon: r.isAddon,
   image: r.imageUrl ?? '',
-  variants: (r.variants ?? []).map((v: any) => ({ name: v.name ?? '', price: v.price, stockId: v.stockId ?? 0, qty: v.qty ?? 1 })),
+  variants: (r.variants ?? []).map((v: any) => ({ name: v.name ?? '', price: v.price, stockId: v.stockId ?? 0, qty: v.qty ?? 1, image: v.imageUrl ?? '' })),
   addons: r.addons ?? [],
   freeAddons: r.freeAddons ?? [],
 })
@@ -208,8 +208,8 @@ export const mapDashboard = (r: any): DashboardData => ({
 /** Draft editor menu → body API. */
 export const menuToApi = (d: MenuDraft) => ({
   name: d.name, description: d.description || null, basePrice: parseInt(String(d.basePrice), 10) || 0,
-  isActive: d.active, isAddon: d.isAddon, imageUrl: d.image || null,
-  variants: d.variants.map((v) => ({ name: v.name || null, price: Number(v.price) || 0, stockId: v.stockId, qty: Number(v.qty) || 1 })),
+  unitLabel: d.unitLabel || null, isActive: d.active, isAddon: d.isAddon, imageUrl: d.image || null,
+  variants: d.variants.map((v) => ({ name: v.name || null, price: Number(v.price) || 0, stockId: v.stockId, qty: Number(v.qty) || 1, imageUrl: v.image || null })),
   addons: d.isAddon ? [] : d.addons,
   freeAddons: d.isAddon ? [] : d.freeAddons,
 })

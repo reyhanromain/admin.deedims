@@ -89,6 +89,10 @@ export function MenuEditorModal() {
                 <label style={labelStyle(t)}>Harga dasar (Rp)</label>
                 <input type="number" value={d.basePrice} onChange={(e) => s.updateDraft({ basePrice: e.target.value })} placeholder="25000" style={inputStyle(t)} />
               </div>
+              <div>
+                <label style={labelStyle(t)}>Label satuan (opsional)</label>
+                <input value={d.unitLabel} onChange={(e) => s.updateDraft({ unitLabel: e.target.value })} placeholder="pack" style={inputStyle(t)} />
+              </div>
             </div>
           </div>
 
@@ -124,14 +128,45 @@ export function MenuEditorModal() {
                 const stk = stockRows.find((x) => x.id === v.stockId)
                 return (
                   <div key={i} style={{ background: t.surfaceAlt, border: `1px solid ${t.rowBorder}`, borderRadius: 12, padding: 12 }}>
-                    <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-                      <input value={v.name} onChange={(e) => s.updateVariant(i, { name: e.target.value })} placeholder="Nama variant (mis. Original)" style={{ ...smallInput, flex: 1, minWidth: 140 }} />
-                      <input type="number" value={v.price} onChange={(e) => s.updateVariant(i, { price: parseInt(e.target.value, 10) || 0 })} placeholder="Harga" style={{ ...smallInput, width: isMobile ? '100%' : 110, flex: isMobile ? '1 1 100%' : undefined }} />
-                      {d.variants.length > 1 && (
-                        <button onClick={() => s.removeVariant(i)} title="Hapus variant" style={{ border: `1px solid ${t.dangerBorder}`, background: t.surface, color: t.dangerInk, width: 36, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Icon size={14} strokeWidth={2.2} path="M3 6h18 M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2 M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                        </button>
-                      )}
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      <div style={{ width: 72, height: 72, flexShrink: 0, borderRadius: 10, overflow: 'hidden', border: `1px solid ${t.inputBorder}`, background: t.surface, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {v.image ? (
+                          <img src={v.image} alt="preview variant" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                        ) : (
+                          <Icon size={20} stroke={t.faint} strokeWidth={1.6} path="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z M8.5 7a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z M21 15l-5-5L5 21" />
+                        )}
+                      </div>
+                      <div style={{ flex: 1, minWidth: isMobile ? '100%' : 220, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          <input value={v.name} onChange={(e) => s.updateVariant(i, { name: e.target.value })} placeholder="Nama variant (mis. Original)" style={{ ...smallInput, flex: 1, minWidth: 140 }} />
+                          <input type="number" value={v.price} onChange={(e) => s.updateVariant(i, { price: parseInt(e.target.value, 10) || 0 })} placeholder="Harga" style={{ ...smallInput, width: isMobile ? '100%' : 110, flex: isMobile ? '1 1 100%' : undefined }} />
+                          {d.variants.length > 1 && (
+                            <button onClick={() => s.removeVariant(i)} title="Hapus variant" style={{ border: `1px solid ${t.dangerBorder}`, background: t.surface, color: t.dangerInk, width: 36, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <Icon size={14} strokeWidth={2.2} path="M3 6h18 M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2 M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                            </button>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <label style={{ border: `1px solid ${t.inputBorder}`, background: t.surface, color: t.ink, fontSize: 11.5, fontWeight: 700, borderRadius: 8, padding: '6px 11px', cursor: 'pointer' }}>
+                            {v.image ? 'Ganti preview' : 'Pilih preview'}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0]
+                                if (file) s.setVariantImageFromFile(i, file)
+                                e.target.value = ''
+                              }}
+                              style={{ display: 'none' }}
+                            />
+                          </label>
+                          {v.image && (
+                            <button onClick={() => s.updateVariant(i, { image: '' })} style={{ border: `1px solid ${t.dangerBorder}`, background: t.surface, color: t.dangerInk, fontSize: 11.5, fontWeight: 700, borderRadius: 8, padding: '6px 10px' }}>
+                              Hapus preview
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     </div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 11.5, fontWeight: 700, color: t.muted }}>Pakai stock</span>
