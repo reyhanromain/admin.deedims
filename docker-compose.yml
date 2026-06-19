@@ -1,10 +1,10 @@
 services:
   backend:
     build: ./backend
+    env_file:
+      - ./backend/.env
     environment:
       DATABASE_URL: "file:/data/dev.db"   # SQLite di named volume (persist)
-      JWT_SECRET: "${JWT_SECRET:-dev-secret-change-me}"
-      BOT_TOKEN: "${BOT_TOKEN:-}"          # kosongkan untuk mode API-only
       PORT: "3000"
       TZ: "Asia/Jakarta"
       RETENTION_DAYS: "14"
@@ -23,6 +23,17 @@ services:
       - backend
     ports:
       - "8080:80"
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.6.1
+    user: "1000:1000"
+    command: tunnel --config /etc/cloudflared/config.yml run
+    depends_on:
+      - frontend
+    volumes:
+      - ./cloudflared.yml:/etc/cloudflared/config.yml:ro
+      - ${HOME}/.cloudflared/b5311bc4-b39a-4da0-ab79-4520e838b45e.json:/etc/cloudflared/b5311bc4-b39a-4da0-ab79-4520e838b45e.json:ro
     restart: unless-stopped
 
 volumes:
