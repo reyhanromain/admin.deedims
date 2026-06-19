@@ -2,27 +2,40 @@ services:
   backend:
     build: ./backend
     env_file:
-      - ./backend/.env
+      - ${BACKEND_ENV_FILE:-./backend/.env}
     environment:
-      DATABASE_URL: "file:/data/dev.db"   # SQLite di named volume (persist)
+      DATABASE_URL: "file:/data/app.db"
       PORT: "3000"
       TZ: "Asia/Jakarta"
       RETENTION_DAYS: "14"
-      CORS_ORIGIN: "${CORS_ORIGIN:-http://localhost:8080}"
-      UPLOADS_DIR: "/data/uploads"        # foto menu di volume (persist)
+      CORS_ORIGIN: "${PUBLIC_ORIGIN:-http://localhost:8080}"
+      UPLOADS_DIR: "/data/uploads"
       MAX_UPLOAD_MB: "5"
     volumes:
-      - dimsum_db:/data
+      - app_data:/data
     ports:
-      - "3100:3000"                        # host 3100 (3000 lokal dipakai layanan lain)
+      - "127.0.0.1:${BACKEND_HOST_PORT:-3100}:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
     restart: unless-stopped
 
   frontend:
     build: ./frontend
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
-      - "8080:80"
+      - "127.0.0.1:${FRONTEND_HOST_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
     restart: unless-stopped
 
   cloudflared:
@@ -30,11 +43,13 @@ services:
     user: "1000:1000"
     command: tunnel --config /etc/cloudflared/config.yml run
     depends_on:
-      - frontend
+      frontend:
+        condition: service_healthy
     volumes:
-      - ./cloudflared.yml:/etc/cloudflared/config.yml:ro
-      - ${HOME}/.cloudflared/b5311bc4-b39a-4da0-ab79-4520e838b45e.json:/etc/cloudflared/b5311bc4-b39a-4da0-ab79-4520e838b45e.json:ro
+      - ${CLOUDFLARED_CONFIG_FILE:-./deploy/cloudflared.prod.yml}:/etc/cloudflared/config.yml:ro
+      - ${CLOUDFLARED_CREDENTIALS_FILE:-${HOME}/.cloudflared/b5311bc4-b39a-4da0-ab79-4520e838b45e.json}:/etc/cloudflared/credentials.json:ro
     restart: unless-stopped
 
 volumes:
-  dimsum_db:
+  app_data:
+    name: ${DATA_VOLUME_NAME:-deedims-local-data}

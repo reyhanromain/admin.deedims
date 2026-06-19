@@ -1,5 +1,5 @@
 tunnel: b5311bc4-b39a-4da0-ab79-4520e838b45e
-credentials-file: /etc/cloudflared/b5311bc4-b39a-4da0-ab79-4520e838b45e.json
+credentials-file: /etc/cloudflared/credentials.json
 
 ingress:
   - hostname: admin.deedims.biz.id
