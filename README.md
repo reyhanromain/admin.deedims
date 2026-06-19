@@ -95,6 +95,10 @@ Versi produk tunggal disimpan di [`VERSION`](VERSION), disinkronkan dengan `back
 dan `frontend/package.json`, lalu dirilis dengan tag Git `vX.Y.Z`. Branch, commit, PR, changelog,
 dan release flow lengkap ada di [`docs/versioning-workflow.md`](docs/versioning-workflow.md).
 
+Deployment production (`main`) dan staging (`dev`), termasuk pemisahan volume,
+secret, bot Telegram, tunnel, backup, dan prosedur rollout, dijelaskan di
+[`docs/deployment-environments.md`](docs/deployment-environments.md).
+
 **Frontend** menguji mapper API↔FE (+ format Asia/Jakarta) dan logika store (login, **lazy-load
 per layar**: muat-sekali/dedup/cache/refresh, toggle menu, saveMenu, single-open PO, routing
 cancellation patchOrder, guard super-user, optimistic stock) dengan modul API di-mock.
