@@ -15,6 +15,7 @@ export interface Variant {
   price: number
   stockId: number
   qty: number
+  image: string
 }
 
 export interface Menu {
@@ -22,6 +23,7 @@ export interface Menu {
   name: string
   description: string
   basePrice: number
+  unitLabel: string
   active: boolean
   isAddon: boolean
   image: string
@@ -210,6 +212,7 @@ export interface MenuDraft {
   name: string
   description: string
   basePrice: number | string
+  unitLabel: string
   active: boolean
   isAddon: boolean
   image: string

@@ -24,9 +24,11 @@ function shapeMenu(m: MenuRow) {
     isActive: m.isActive,
     isAddon: m.isAddon,
     imageUrl: m.imageUrl,
+    unitLabel: m.unitLabel,
     variants: m.variants.map((v) => ({
       name: v.name,
       price: v.price,
+      imageUrl: v.imageUrl,
       stockId: v.stockUsages[0]?.stockItemId ?? null,
       qty: v.stockUsages[0]?.quantity ?? null,
     })),
@@ -38,6 +40,7 @@ function shapeMenu(m: MenuRow) {
 const variantSchema = z.object({
   name: z.string().nullable().optional(),
   price: z.number().int(),
+  imageUrl: z.string().nullable().optional(),
   stockId: z.number().int().nullable().optional(),
   qty: z.number().int().nullable().optional(),
 })
@@ -46,6 +49,7 @@ const menuSchema = z.object({
   name: z.string().min(1),
   description: z.string().nullable().optional(),
   basePrice: z.number().int().default(0),
+  unitLabel: z.string().nullable().optional(),
   isActive: z.boolean().default(true),
   isAddon: z.boolean().default(false),
   imageUrl: z.string().nullable().optional(),
@@ -84,6 +88,7 @@ async function writeChildren(tx: Prisma.TransactionClient, menuId: number, data:
         menuId,
         name: v.name ?? null,
         price: v.price,
+        imageUrl: v.imageUrl ?? null,
         stockUsages: v.stockId != null ? { create: [{ stockItemId: v.stockId, quantity: v.qty ?? 1 }] } : undefined,
       },
     })
@@ -129,7 +134,7 @@ export async function menusRoutes(app: FastifyInstance) {
       const created = await tx.menu.create({
         data: {
           name: d.name, description: d.description ?? null, basePrice: d.basePrice, isActive: d.isActive,
-          isAddon: d.isAddon, imageUrl: d.imageUrl ?? null, telegramFileId: d.telegramFileId ?? null,
+          isAddon: d.isAddon, unitLabel: d.unitLabel ?? null, imageUrl: d.imageUrl ?? null, telegramFileId: d.telegramFileId ?? null,
         },
       })
       await writeChildren(tx, created.id, d)
@@ -159,7 +164,7 @@ export async function menusRoutes(app: FastifyInstance) {
 
       await tx.menu.update({
         where: { id },
-        data: { name: d.name, description: d.description ?? null, basePrice: d.basePrice, isActive: d.isActive, isAddon: d.isAddon, imageUrl: d.imageUrl ?? null, telegramFileId: nextFileId },
+        data: { name: d.name, description: d.description ?? null, basePrice: d.basePrice, unitLabel: d.unitLabel ?? null, isActive: d.isActive, isAddon: d.isAddon, imageUrl: d.imageUrl ?? null, telegramFileId: nextFileId },
       })
 
       const oldVariants = await tx.menuVariant.findMany({ where: { menuId: id }, select: { id: true } })

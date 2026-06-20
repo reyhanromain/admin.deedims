@@ -26,7 +26,7 @@ function testBot(options: { deleteFails?: boolean } = {}) {
       if (options.deleteFails) throw new Error('delete failed')
       return { ok: true, result: true } as any
     }
-    if (method === 'answerCallbackQuery' || method === 'editMessageText' || method === 'editMessageCaption') return { ok: true, result: true } as any
+    if (method === 'answerCallbackQuery' || method === 'editMessageText' || method === 'editMessageCaption' || method === 'editMessageMedia') return { ok: true, result: true } as any
     throw new Error(`Unexpected Telegram API method: ${method}`)
   })
   return { bot, sent }
@@ -117,23 +117,28 @@ describe('grammY customer handlers', () => {
     expect((await prisma.customer.findUniqueOrThrow({ where: { telegramUserId: 222n } })).activeOrderMessageId).toBeNull()
   })
 
-  it('quantity menampilkan isi stock dan free complement hanya sebagai teks', async () => {
+  it('quantity menampilkan isi stock, label satuan, dan preview variant', async () => {
     const { bot, sent } = testBot()
     await bot.init()
     const variant = await prisma.menuVariant.findFirstOrThrow({ where: { menuId: 1 } })
     await prisma.stockItem.update({ where: { id: 1 }, data: { unit: 'pcs', name: 'Dimsum' } })
-    await prisma.menu.update({ where: { id: 1 }, data: { name: 'Dimsum Mentai' } })
+    await prisma.menu.update({ where: { id: 1 }, data: { name: 'Dimsum Mentai', unitLabel: 'pack' } })
     await prisma.menu.update({ where: { id: 2 }, data: { name: 'Chili Oil' } })
+    await prisma.menuVariant.update({ where: { id: variant.id }, data: { imageUrl: 'https://example.com/variant.png' } })
     await prisma.menuAddon.create({ data: { menuId: 1, addonMenuId: 2, isFree: true } })
     await bot.handleUpdate(messageUpdate('/order'))
     await bot.handleUpdate(callbackUpdate(`o:v:${variant.id}:1`, 2))
     await bot.handleUpdate(callbackUpdate(`o:q:${variant.id}:2:1`, 3))
 
-    const edits = sent.filter((call) => call.method === 'editMessageText').map((call) => call.payload)
-    expect(edits[0].text).toContain('Isi: 2 pcs Dimsum')
-    expect(edits[1].text).toContain('- Chili Oil x2 (Free)')
-    expect(JSON.stringify(edits[1].reply_markup)).not.toContain('Gratis')
-    expect(JSON.stringify(edits[1].reply_markup)).toContain('Rp5.000')
+    const edits = sent.filter((call) => call.method === 'editMessageText' || call.method === 'editMessageMedia').map((call) => call.payload)
+    const firstBody = (edits[0].text ?? edits[0].caption ?? edits[0].media?.caption ?? '') as string
+    const secondBody = (edits[1].text ?? edits[1].caption ?? edits[1].media?.caption ?? '') as string
+    expect(firstBody).toContain('Isi: 2 pcs Dimsum')
+    expect(JSON.stringify(edits[0])).toContain('Add 1 pack')
+    expect(sent.some((call) => call.method === 'editMessageMedia' && JSON.stringify(call.payload).includes('variant.png'))).toBe(true)
+    expect(secondBody).toContain('- Chili Oil x2 (Free)')
+    expect(JSON.stringify(edits[1])).not.toContain('Gratis')
+    expect(JSON.stringify(edits[1])).toContain('Rp5.000')
   })
 
   it('callback disimpan memakai label tombol, sementara raw payload tetap tersedia', async () => {

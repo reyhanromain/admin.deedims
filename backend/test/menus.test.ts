@@ -13,7 +13,8 @@ describe('menus', () => {
   it('list ramping: variant {name,price,stockId,qty} (tanpa id/telegramFileId) + paginated', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/menus', headers: authH(token) })
     const a = data(res).find((m: { id: number }) => m.id === 1)
-    expect(a.variants[0]).toEqual({ name: 'Reg', price: 10000, stockId: 1, qty: 2 })
+    expect(a).toMatchObject({ unitLabel: null })
+    expect(a.variants[0]).toMatchObject({ name: 'Reg', price: 10000, stockId: 1, qty: 2, imageUrl: null })
     expect(a).not.toHaveProperty('telegramFileId')
     expect(a.addons).toEqual([2])
     expect(a.freeAddons).toEqual([])
@@ -23,10 +24,11 @@ describe('menus', () => {
   it('create menu dengan variant + addon → 201', async () => {
     const res = await app.inject({
       method: 'POST', url: '/api/menus', headers: authH(token),
-      payload: { name: 'Baru', basePrice: 9000, variants: [{ name: 'V', price: 9000, stockId: 1, qty: 1 }], addons: [2], freeAddons: [2] },
+      payload: { name: 'Baru', basePrice: 9000, unitLabel: 'pack', variants: [{ name: 'V', price: 9000, imageUrl: '/uploads/v.png', stockId: 1, qty: 1 }], addons: [2], freeAddons: [2] },
     })
     expect(res.statusCode).toBe(201)
-    expect(data(res).variants[0]).toEqual({ name: 'V', price: 9000, stockId: 1, qty: 1 })
+    expect(data(res)).toMatchObject({ unitLabel: 'pack' })
+    expect(data(res).variants[0]).toEqual({ name: 'V', price: 9000, imageUrl: '/uploads/v.png', stockId: 1, qty: 1 })
     expect(data(res).addons).toEqual([2])
     expect(data(res).freeAddons).toEqual([2])
     const links = await prisma.menuAddon.findMany({ where: { menuId: data(res).id, addonMenuId: 2 }, orderBy: { isFree: 'asc' } })
@@ -37,9 +39,10 @@ describe('menus', () => {
     await prisma.menu.update({ where: { id: 1 }, data: { imageUrl: '/uploads/a.jpg', telegramFileId: 'CACHED' } })
     const res = await app.inject({
       method: 'PATCH', url: '/api/menus/1', headers: authH(token),
-      payload: { name: 'Menu A', basePrice: 10000, imageUrl: '/uploads/b.jpg', variants: [{ name: 'Reg', price: 10000, stockId: 1, qty: 2 }], addons: [2] },
+      payload: { name: 'Menu A', basePrice: 10000, imageUrl: '/uploads/b.jpg', unitLabel: 'pack', variants: [{ name: 'Reg', price: 10000, imageUrl: '/uploads/variant-b.jpg', stockId: 1, qty: 2 }], addons: [2] },
     })
     expect(data(res).imageUrl).toBe('/uploads/b.jpg')
+    expect(data(res).unitLabel).toBe('pack')
     expect((await prisma.menu.findUniqueOrThrow({ where: { id: 1 } })).telegramFileId).toBeNull()
   })
 

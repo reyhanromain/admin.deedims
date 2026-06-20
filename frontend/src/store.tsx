@@ -212,6 +212,7 @@ export interface AdminStore extends State {
   toggleAddon: (id: number) => void
   toggleFreeAddon: (id: number) => void
   setDraftImageFromFile: (file: File) => void
+  setVariantImageFromFile: (index: number, file: File) => void
   saveMenu: () => void
   // stock
   adjustStock: (id: number, delta: number) => void
@@ -693,7 +694,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
           set({ editMenuId: menu.id, menuDraft: { ...JSON.parse(JSON.stringify(menu)), freeAddons: menu.freeAddons ?? [] } })
         } else {
           const firstStock = state.lists.stock.rows[0] ? (state.lists.stock.rows[0] as StockItem).id : 1
-          set({ editMenuId: 'new', menuDraft: { name: '', description: '', basePrice: 0, active: true, isAddon: false, image: '', variants: [{ name: '(default)', price: 0, stockId: firstStock, qty: 1 }], addons: [], freeAddons: [] } })
+          set({ editMenuId: 'new', menuDraft: { name: '', description: '', basePrice: 0, unitLabel: '', active: true, isAddon: false, image: '', variants: [{ name: '(default)', price: 0, stockId: firstStock, qty: 1, image: '' }], addons: [], freeAddons: [] } })
         }
       },
       closeMenuEditor: () => set({ editMenuId: null, menuDraft: null }),
@@ -701,7 +702,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       updateVariant: (i, patch) => update((s) => (s.menuDraft ? { menuDraft: { ...s.menuDraft, variants: s.menuDraft.variants.map((v, j) => (j === i ? { ...v, ...patch } : v)) } } : {})),
       addVariant: () => {
         const fs = state.lists.stock.rows[0] ? (state.lists.stock.rows[0] as StockItem).id : 1
-        update((s) => (s.menuDraft ? { menuDraft: { ...s.menuDraft, variants: [...s.menuDraft.variants, { name: '', price: 0, stockId: fs, qty: 1 }] } } : {}))
+        update((s) => (s.menuDraft ? { menuDraft: { ...s.menuDraft, variants: [...s.menuDraft.variants, { name: '', price: 0, stockId: fs, qty: 1, image: '' }] } } : {}))
       },
       removeVariant: (i) => update((s) => (s.menuDraft ? { menuDraft: { ...s.menuDraft, variants: s.menuDraft.variants.filter((_, j) => j !== i) } } : {})),
       toggleAddon: (id) => update((s) => {
@@ -720,6 +721,15 @@ export function AdminProvider({ children }: { children: ReactNode }) {
             const url = await uploadImage(file)
             update((s) => (s.menuDraft ? { menuDraft: { ...s.menuDraft, image: url } } : {}))
             showToast('Foto terupload')
+          } catch (e) { fail(e) }
+        })()
+      },
+      setVariantImageFromFile: (index, file) => {
+        void (async () => {
+          try {
+            const url = await uploadImage(file)
+            update((s) => (s.menuDraft ? { menuDraft: { ...s.menuDraft, variants: s.menuDraft.variants.map((v, i) => (i === index ? { ...v, image: url } : v)) } } : {}))
+            showToast('Preview variant terupload')
           } catch (e) { fail(e) }
         })()
       },

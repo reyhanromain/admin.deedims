@@ -31,9 +31,9 @@ describe('mapStock / mapMenu', () => {
     expect(mapStock({ id: 1, label: 's1', name: 'S', quantity: 5, unit: null })).toEqual({ id: 1, label: 's1', name: 'S', quantity: 5, unit: 'pcs' })
   })
   it('menu: isActive→active, imageUrl→image, variant {stockId,qty}, addons', () => {
-    const m = mapMenu({ id: 1, name: 'A', description: null, basePrice: 10000, isActive: false, isAddon: false, imageUrl: '/uploads/a.png', variants: [{ name: 'Reg', price: 10000, stockId: 2, qty: 3 }], addons: [4], freeAddons: [4] })
-    expect(m).toMatchObject({ active: false, image: '/uploads/a.png', addons: [4], freeAddons: [4] })
-    expect(m.variants[0]).toEqual({ name: 'Reg', price: 10000, stockId: 2, qty: 3 })
+    const m = mapMenu({ id: 1, name: 'A', description: null, basePrice: 10000, unitLabel: 'pack', isActive: false, isAddon: false, imageUrl: '/uploads/a.png', variants: [{ name: 'Reg', price: 10000, imageUrl: '/uploads/v.png', stockId: 2, qty: 3 }], addons: [4], freeAddons: [4] })
+    expect(m).toMatchObject({ active: false, unitLabel: 'pack', image: '/uploads/a.png', addons: [4], freeAddons: [4] })
+    expect(m.variants[0]).toEqual({ name: 'Reg', price: 10000, image: '/uploads/v.png', stockId: 2, qty: 3 })
   })
 })
 
@@ -102,9 +102,9 @@ describe('mapDashboard', () => {
 })
 
 describe('menuToApi', () => {
-  const draft: MenuDraft = { name: 'X', description: 'desc', basePrice: '12000', active: false, isAddon: false, image: '/uploads/x.png', variants: [{ name: 'Reg', price: 12000, stockId: 1, qty: 2 }], addons: [3, 4], freeAddons: [4] }
+  const draft: MenuDraft = { name: 'X', description: 'desc', basePrice: '12000', unitLabel: 'pack', active: false, isAddon: false, image: '/uploads/x.png', variants: [{ name: 'Reg', price: 12000, stockId: 1, qty: 2, image: '/uploads/v.png' }], addons: [3, 4], freeAddons: [4] }
   it('active→isActive, image→imageUrl, basePrice parse', () => {
-    expect(menuToApi(draft)).toMatchObject({ name: 'X', basePrice: 12000, isActive: false, imageUrl: '/uploads/x.png', variants: [{ name: 'Reg', price: 12000, stockId: 1, qty: 2 }], addons: [3, 4], freeAddons: [4] })
+    expect(menuToApi(draft)).toMatchObject({ name: 'X', basePrice: 12000, unitLabel: 'pack', isActive: false, imageUrl: '/uploads/x.png', variants: [{ name: 'Reg', price: 12000, stockId: 1, qty: 2, imageUrl: '/uploads/v.png' }], addons: [3, 4], freeAddons: [4] })
   })
   it('menu add-on → addons dikosongkan', () => {
     expect(menuToApi({ ...draft, isAddon: true })).toMatchObject({ addons: [], freeAddons: [] })
