@@ -32,7 +32,7 @@ const paged = (rows: any[], extra: Record<string, unknown> = {}) => ({ rows, tot
 
 const orderRow = { id: 1, code: 'DD-1', customer: 'Sari', username: 'sari', createdAt: '12 Jun, 09:13', itemsSummary: 'Menu A x1', total: 10000, status: 'confirmed', pay: 'pending', cancelRequested: true }
 const orderDetail = { id: 1, code: 'DD-1', customer: 'Sari', username: 'sari', createdAt: '12 Jun, 09:13', updatedAt: '12 Jun, 10:00', status: 'confirmed', pay: 'pending', adminNotes: '', cancelRequested: true, total: 10000, items: [{ name: 'Menu A', meta: '', qty: 1, price: 10000, addon: false }], poTitle: 'PO Open', poDate: '14 Jun 2026' }
-const menuRow = { id: 1, name: 'Menu A', description: '', basePrice: 10000, active: true, isAddon: false, image: '', variants: [{ name: 'Reg', price: 10000, stockId: 1, qty: 2 }], addons: [2], freeAddons: [] }
+const menuRow = { id: 1, name: 'Menu A', description: '', basePrice: 10000, unitLabel: '', active: true, isAddon: false, image: '', variants: [{ name: 'Reg', price: 10000, stockId: 1, qty: 2, image: '' }], addons: [2], freeAddons: [] }
 const stockRow = { id: 1, label: 's1', name: 'Stock 1', quantity: 50, unit: 'pcs' }
 const poOpen = { id: 1, title: 'PO Open', description: '', status: 'open', date: '14 Jun 2026', note: '', orderCount: 1, revenue: 10000 }
 const poDraft = { id: 2, title: 'PO Draft', description: '', status: 'draft', date: 'TBD', note: '—', orderCount: 0, revenue: 0 }
@@ -141,7 +141,7 @@ describe('menus', () => {
   })
 
   it('saveMenu baru → createMenu body + prepend', async () => {
-    api.createMenu.mockResolvedValue({ id: 9, name: 'Baru', description: null, basePrice: 9000, isActive: true, isAddon: false, imageUrl: null, variants: [], addons: [], freeAddons: [] })
+    api.createMenu.mockResolvedValue({ id: 9, name: 'Baru', description: null, basePrice: 9000, unitLabel: '', isActive: true, isAddon: false, imageUrl: null, variants: [], addons: [], freeAddons: [] })
     const r = await mountAuthed()
     await goto(r, 'menus')
     act(() => r.current.openMenuEditor(null))
@@ -152,7 +152,7 @@ describe('menus', () => {
   })
 
   it('toggleFreeAddon bisa berdampingan dengan add-on berbayar', async () => {
-    api.updateMenu.mockResolvedValue({ id: 1, name: 'Menu A', description: '', basePrice: 10000, isActive: true, isAddon: false, imageUrl: '', variants: [{ name: 'Reg', price: 10000, stockId: 1, qty: 2 }], addons: [2], freeAddons: [2] })
+    api.updateMenu.mockResolvedValue({ id: 1, name: 'Menu A', description: '', basePrice: 10000, unitLabel: '', isActive: true, isAddon: false, imageUrl: '', variants: [{ name: 'Reg', price: 10000, stockId: 1, qty: 2, imageUrl: '' }], addons: [2], freeAddons: [2] })
     const r = await mountAuthed()
     await goto(r, 'menus')
     act(() => r.current.openMenuEditor(menuRow as any))

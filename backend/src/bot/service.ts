@@ -53,7 +53,7 @@ export async function listOrderableMenus() {
   const preOrder = await openPreOrder()
   if (!preOrder) return { preOrder: null, menus: [] }
   const candidates = await prisma.menu.findMany({
-    where: { isActive: true, isAddon: false },
+    where: { isActive: true },
     include: {
       variants: {
         where: { isActive: true },
@@ -62,16 +62,58 @@ export async function listOrderableMenus() {
       },
       addonLinks: {
         where: { isActive: true },
-        include: { addonMenu: { include: { variants: { where: { isActive: true } } } } },
+        include: { addonMenu: { include: { variants: { where: { isActive: true }, include: { stockUsages: { include: { stockItem: true } } } } } } },
         orderBy: { sortOrder: 'asc' },
       },
     },
     orderBy: { id: 'asc' },
   })
-  const menus = candidates.filter((menu) => menu.variants.some((variant) =>
-    variant.stockUsages.length === 0 || variant.stockUsages.every((usage) => usage.stockItem.isActive && usage.stockItem.quantity >= usage.quantity),
-  ))
+  const menus = candidates.filter((menu) => {
+    const freeVariants = Array.from(new Map(menu.addonLinks
+      .filter((link) => link.isFree && link.addonMenu.isActive && link.addonMenu.variants.length === 1)
+      .map((link) => [link.addonMenuId, link.addonMenu.variants[0]])).values())
+    const freeConfigurationValid = menu.addonLinks
+      .filter((link) => link.isFree)
+      .every((link) => link.addonMenu.isActive && link.addonMenu.variants.length === 1)
+    return freeConfigurationValid && menu.variants.some((variant) => variantsFitAvailableStock([variant, ...freeVariants]))
+  })
   return { preOrder, menus }
+}
+
+type StockedVariant = {
+  stockUsages: Array<{ stockItemId: number; quantity: number; stockItem: { quantity: number; isActive: boolean } }>
+}
+
+function variantsFitAvailableStock(variants: StockedVariant[]) {
+  const required = new Map<number, { quantity: number; available: number; active: boolean }>()
+  for (const variant of variants) for (const usage of variant.stockUsages) {
+    const current = required.get(usage.stockItemId)
+    required.set(usage.stockItemId, {
+      quantity: (current?.quantity ?? 0) + usage.quantity,
+      available: usage.stockItem.quantity,
+      active: usage.stockItem.isActive,
+    })
+  }
+  return Array.from(required.values()).every((row) => row.active && row.available >= row.quantity)
+}
+
+export async function listAutomaticFreeAddonVariants(menuId: number) {
+  const links = await prisma.menuAddon.findMany({
+    where: { menuId, isFree: true, isActive: true },
+    include: { addonMenu: { include: { variants: { where: { isActive: true }, include: variantInclude, orderBy: { id: 'asc' } } } } },
+    orderBy: { sortOrder: 'asc' },
+  })
+  const variants = [] as Array<Prisma.MenuVariantGetPayload<{ include: typeof variantInclude }>>
+  const seenMenus = new Set<number>()
+  for (const link of links) {
+    if (seenMenus.has(link.addonMenuId)) continue
+    seenMenus.add(link.addonMenuId)
+    if (!link.addonMenu.isActive || link.addonMenu.variants.length !== 1) {
+      throw new BotBusinessError('FREE_ADDON_INVALID', `Pelengkap gratis ${link.addonMenu.name} harus memiliki tepat satu varian aktif.`)
+    }
+    variants.push(link.addonMenu.variants[0])
+  }
+  return variants
 }
 
 async function currentCartStock(telegramUserId: bigint) {
@@ -91,11 +133,8 @@ async function currentCartStock(telegramUserId: bigint) {
 export async function maxAddableQuantity(telegramUserId: bigint, variantId: number) {
   const variant = await prisma.menuVariant.findUnique({ where: { id: variantId }, include: variantInclude })
   if (!variant?.isActive || !variant.menu.isActive) return 0
-  const used = await currentCartStock(telegramUserId)
-  if (variant.stockUsages.length === 0) return 99
-  return Math.max(0, Math.min(...variant.stockUsages.map((usage) =>
-    Math.floor((usage.stockItem.quantity - (used.get(usage.stockItemId) ?? 0)) / usage.quantity),
-  )))
+  const freeAddons = await listAutomaticFreeAddonVariants(variant.menuId)
+  return capacityForVariants(telegramUserId, [variant, ...freeAddons])
 }
 
 type AddCartInput = {
@@ -111,25 +150,24 @@ export async function addToCart(input: AddCartInput) {
   }
   if (!await openPreOrder()) throw new BotBusinessError('PREORDER_CLOSED', 'Pre-order sudah tidak dibuka.')
   const main = await prisma.menuVariant.findUnique({ where: { id: input.variantId }, include: variantInclude })
-  if (!main?.isActive || !main.menu.isActive || main.menu.isAddon) {
+  if (!main?.isActive || !main.menu.isActive) {
     throw new BotBusinessError('MENU_INVALID', 'Menu sudah tidak tersedia.')
   }
   let addon: Prisma.MenuVariantGetPayload<{ include: typeof variantInclude }> | null = null
-  let addonIsFree = false
   if (input.addonVariantId) {
     addon = await prisma.menuVariant.findUnique({ where: { id: input.addonVariantId }, include: variantInclude })
     if (!addon?.isActive || !addon.menu.isActive || !addon.menu.isAddon) {
       throw new BotBusinessError('ADDON_INVALID', 'Add-on sudah tidak tersedia.')
     }
     const link = await prisma.menuAddon.findFirst({
-      where: { menuId: main.menuId, addonMenuId: addon.menuId, isActive: true },
-      orderBy: { isFree: 'desc' },
+      where: { menuId: main.menuId, addonMenuId: addon.menuId, isActive: true, isFree: false },
     })
     if (!link) throw new BotBusinessError('ADDON_INVALID', 'Add-on tidak berlaku untuk menu ini.')
-    addonIsFree = link.isFree
   }
 
-  const capacity = await capacityForSelection(input.telegramUserId, main, addon)
+  const freeAddons = await listAutomaticFreeAddonVariants(main.menuId)
+
+  const capacity = await capacityForVariants(input.telegramUserId, [main, ...freeAddons, ...(addon ? [addon] : [])])
   if (capacity < input.quantity) throw new BotBusinessError('STOCK_INSUFFICIENT', 'Stock tidak cukup untuk quantity tersebut.')
 
   return prisma.$transaction(async (tx) => {
@@ -145,34 +183,49 @@ export async function addToCart(input: AddCartInput) {
         quantity: input.quantity,
       },
     })
-    if (addon) {
+    for (const freeAddon of freeAddons) {
       await tx.cartItem.create({
         data: {
           telegramUserId: input.telegramUserId,
           parentCartItemId: parent.id,
           itemType: 'addon',
-          menuId: addon.menuId,
-          menuVariantId: addon.id,
-          menuNameSnapshot: addon.menu.name,
-          variantNameSnapshot: visibleVariantName(addon.name),
-          unitPrice: addonIsFree ? 0 : addon.price,
+          isFree: true,
+          menuId: freeAddon.menuId,
+          menuVariantId: freeAddon.id,
+          menuNameSnapshot: freeAddon.menu.name,
+          variantNameSnapshot: visibleVariantName(freeAddon.name),
+          unitPrice: 0,
           quantity: input.quantity,
         },
       })
     }
+    if (addon) await tx.cartItem.create({
+      data: {
+        telegramUserId: input.telegramUserId,
+      parentCartItemId: parent.id,
+      itemType: 'addon',
+      isFree: false,
+        menuId: addon.menuId,
+        menuVariantId: addon.id,
+        menuNameSnapshot: addon.menu.name,
+        variantNameSnapshot: visibleVariantName(addon.name),
+        unitPrice: addon.price,
+        quantity: input.quantity,
+      },
+    })
     return parent
   })
 }
 
-async function capacityForSelection(
+async function capacityForVariants(
   telegramUserId: bigint,
-  main: Prisma.MenuVariantGetPayload<{ include: typeof variantInclude }>,
-  addon: Prisma.MenuVariantGetPayload<{ include: typeof variantInclude }> | null,
+  variants: Array<Prisma.MenuVariantGetPayload<{ include: typeof variantInclude }>>,
 ) {
   const used = await currentCartStock(telegramUserId)
   const needed = new Map<number, { perUnit: number; available: number }>()
-  for (const variant of [main, addon].filter(Boolean) as Array<typeof main>) {
+  for (const variant of variants) {
     for (const usage of variant.stockUsages) {
+      if (!usage.stockItem.isActive) return 0
       const current = needed.get(usage.stockItemId)
       needed.set(usage.stockItemId, {
         perUnit: (current?.perUnit ?? 0) + usage.quantity,
@@ -313,11 +366,11 @@ async function validateCartRows(tx: Prisma.TransactionClient, rows: CartRow[]) {
     }
     if (row.itemType === 'addon') {
       const parent = rows.find((candidate) => candidate.id === row.parentCartItemId && candidate.itemType === 'main')
-      const link = parent ? await tx.menuAddon.findFirst({ where: { menuId: parent.menuId, addonMenuId: row.menuId, isActive: true }, orderBy: { isFree: 'desc' } }) : null
+      const link = parent ? await tx.menuAddon.findFirst({ where: { menuId: parent.menuId, addonMenuId: row.menuId, isActive: true, isFree: row.isFree } }) : null
       if (!parent || !mainMenuIds.has(parent.menuId) || !link) {
         throw new BotBusinessError('CART_INVALID', `Add-on ${row.menuNameSnapshot} sudah tidak berlaku.`)
       }
-      effectivePrices.set(row.id, link.isFree ? 0 : row.variant.price)
+      effectivePrices.set(row.id, row.isFree ? 0 : row.variant.price)
     } else {
       effectivePrices.set(row.id, row.variant.price)
     }
@@ -410,7 +463,7 @@ export async function reorderCompleted(telegramUserId: bigint, orderId: number) 
   let priceChanged = false
   for (const main of mains) {
     if (!main.menuVariantId) { filtered++; continue }
-    const addon = order.items.find((item) => item.parentOrderItemId === main.id)
+    const addon = order.items.find((item) => item.parentOrderItemId === main.id && item.unitPrice > 0)
     const current = await prisma.menuVariant.findUnique({ where: { id: main.menuVariantId } })
     if (!current) { filtered++; continue }
     priceChanged ||= current.price !== main.unitPrice

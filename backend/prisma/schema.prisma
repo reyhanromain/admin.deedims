@@ -41,6 +41,7 @@ model Customer {
   blockedBy       User?     @relation("CustomerBlockedBy", fields: [blockedById], references: [id])
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
+  activeOrderMessageId BigInt? @map("active_order_message_id")
 
   messages        BotMessage[]
 
@@ -131,6 +132,7 @@ model Menu {
   name           String
   description    String?
   basePrice      Int      @default(0) @map("base_price")
+  unitLabel      String?  @map("unit_label")            // [CMS] label satuan opsional utk tombol qty
   isActive       Boolean  @default(true) @map("is_active")
   imageUrl       String?  @map("image_url")              // [CMS] sumber kebenaran: path file lokal
   telegramFileId String?  @map("telegram_file_id")       // [CMS] cache file_id utk re-send cepat via bot
@@ -154,6 +156,7 @@ model MenuVariant {
   menu      Menu     @relation(fields: [menuId], references: [id])
   name      String?
   price     Int
+  imageUrl  String?  @map("image_url")                  // [CMS] preview image per variant
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -299,6 +302,7 @@ model CartItem {
   telegramUserId     BigInt      @map("telegram_user_id")
   parentCartItemId   Int?        @map("parent_cart_item_id")
   itemType           String      @default("main") @map("item_type")
+  isFree             Boolean     @default(false) @map("is_free")
   menuId             Int         @map("menu_id")
   menu                Menu        @relation(fields: [menuId], references: [id])
   menuVariantId      Int         @map("menu_variant_id")

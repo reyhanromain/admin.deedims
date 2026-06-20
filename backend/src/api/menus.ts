@@ -24,9 +24,11 @@ function shapeMenu(m: MenuRow) {
     isActive: m.isActive,
     isAddon: m.isAddon,
     imageUrl: m.imageUrl,
+    unitLabel: m.unitLabel,
     variants: m.variants.map((v) => ({
       name: v.name,
       price: v.price,
+      imageUrl: v.imageUrl,
       stockId: v.stockUsages[0]?.stockItemId ?? null,
       qty: v.stockUsages[0]?.quantity ?? null,
     })),
@@ -38,6 +40,7 @@ function shapeMenu(m: MenuRow) {
 const variantSchema = z.object({
   name: z.string().nullable().optional(),
   price: z.number().int(),
+  imageUrl: z.string().nullable().optional(),
   stockId: z.number().int().nullable().optional(),
   qty: z.number().int().nullable().optional(),
 })
@@ -46,6 +49,7 @@ const menuSchema = z.object({
   name: z.string().min(1),
   description: z.string().nullable().optional(),
   basePrice: z.number().int().default(0),
+  unitLabel: z.string().nullable().optional(),
   isActive: z.boolean().default(true),
   isAddon: z.boolean().default(false),
   imageUrl: z.string().nullable().optional(),
@@ -57,6 +61,26 @@ const menuSchema = z.object({
 
 type MenuInput = z.infer<typeof menuSchema>
 
+async function validateFreeAddons(data: MenuInput, editingId?: number) {
+  const freeAddonIds = Array.from(new Set(data.freeAddons))
+  if (!data.isAddon && freeAddonIds.length) {
+    const candidates = await prisma.menu.findMany({
+      where: { id: { in: freeAddonIds }, isAddon: true },
+      include: { variants: { where: { isActive: true } } },
+    })
+    const validIds = new Set(candidates.filter((menu) => menu.variants.length === 1).map((menu) => menu.id))
+    if (freeAddonIds.some((id) => !validIds.has(id))) {
+      throw new HttpError(400, 'Menu pelengkap gratis harus memiliki tepat satu varian aktif.', 'FREE_ADDON_VARIANT_INVALID')
+    }
+  }
+  if (editingId) {
+    const freeReferences = await prisma.menuAddon.count({ where: { addonMenuId: editingId, isFree: true, isActive: true } })
+    if (freeReferences && (!data.isAddon || data.variants.length !== 1)) {
+      throw new HttpError(400, 'Menu ini dipakai sebagai pelengkap gratis dan harus memiliki tepat satu varian aktif.', 'FREE_ADDON_VARIANT_INVALID')
+    }
+  }
+}
+
 async function writeChildren(tx: Prisma.TransactionClient, menuId: number, data: MenuInput) {
   for (const v of data.variants) {
     await tx.menuVariant.create({
@@ -64,6 +88,7 @@ async function writeChildren(tx: Prisma.TransactionClient, menuId: number, data:
         menuId,
         name: v.name ?? null,
         price: v.price,
+        imageUrl: v.imageUrl ?? null,
         stockUsages: v.stockId != null ? { create: [{ stockItemId: v.stockId, quantity: v.qty ?? 1 }] } : undefined,
       },
     })
@@ -103,12 +128,13 @@ export async function menusRoutes(app: FastifyInstance) {
     const parsed = menuSchema.safeParse(req.body)
     if (!parsed.success) throw new HttpError(400, 'Invalid payload', 'VALIDATION')
     const d = parsed.data
+    await validateFreeAddons(d)
 
     const id = await prisma.$transaction(async (tx) => {
       const created = await tx.menu.create({
         data: {
           name: d.name, description: d.description ?? null, basePrice: d.basePrice, isActive: d.isActive,
-          isAddon: d.isAddon, imageUrl: d.imageUrl ?? null, telegramFileId: d.telegramFileId ?? null,
+          isAddon: d.isAddon, unitLabel: d.unitLabel ?? null, imageUrl: d.imageUrl ?? null, telegramFileId: d.telegramFileId ?? null,
         },
       })
       await writeChildren(tx, created.id, d)
@@ -129,6 +155,7 @@ export async function menusRoutes(app: FastifyInstance) {
 
     const exists = await prisma.menu.findUnique({ where: { id } })
     if (!exists) throw new HttpError(404, 'Menu tidak ditemukan', 'NOT_FOUND')
+    await validateFreeAddons(d, id)
 
     await prisma.$transaction(async (tx) => {
       // Ganti foto → cache telegram_file_id basi (kecuali dikirim eksplisit).
@@ -137,7 +164,7 @@ export async function menusRoutes(app: FastifyInstance) {
 
       await tx.menu.update({
         where: { id },
-        data: { name: d.name, description: d.description ?? null, basePrice: d.basePrice, isActive: d.isActive, isAddon: d.isAddon, imageUrl: d.imageUrl ?? null, telegramFileId: nextFileId },
+        data: { name: d.name, description: d.description ?? null, basePrice: d.basePrice, unitLabel: d.unitLabel ?? null, isActive: d.isActive, isAddon: d.isAddon, imageUrl: d.imageUrl ?? null, telegramFileId: nextFileId },
       })
 
       const oldVariants = await tx.menuVariant.findMany({ where: { menuId: id }, select: { id: true } })

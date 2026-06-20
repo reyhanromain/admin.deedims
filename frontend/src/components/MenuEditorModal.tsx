@@ -89,6 +89,10 @@ export function MenuEditorModal() {
                 <label style={labelStyle(t)}>Harga dasar (Rp)</label>
                 <input type="number" value={d.basePrice} onChange={(e) => s.updateDraft({ basePrice: e.target.value })} placeholder="25000" style={inputStyle(t)} />
               </div>
+              <div>
+                <label style={labelStyle(t)}>Label satuan (opsional)</label>
+                <input value={d.unitLabel} onChange={(e) => s.updateDraft({ unitLabel: e.target.value })} placeholder="pack" style={inputStyle(t)} />
+              </div>
             </div>
           </div>
 
@@ -124,14 +128,45 @@ export function MenuEditorModal() {
                 const stk = stockRows.find((x) => x.id === v.stockId)
                 return (
                   <div key={i} style={{ background: t.surfaceAlt, border: `1px solid ${t.rowBorder}`, borderRadius: 12, padding: 12 }}>
-                    <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-                      <input value={v.name} onChange={(e) => s.updateVariant(i, { name: e.target.value })} placeholder="Nama variant (mis. Original)" style={{ ...smallInput, flex: 1, minWidth: 140 }} />
-                      <input type="number" value={v.price} onChange={(e) => s.updateVariant(i, { price: parseInt(e.target.value, 10) || 0 })} placeholder="Harga" style={{ ...smallInput, width: isMobile ? '100%' : 110, flex: isMobile ? '1 1 100%' : undefined }} />
-                      {d.variants.length > 1 && (
-                        <button onClick={() => s.removeVariant(i)} title="Hapus variant" style={{ border: `1px solid ${t.dangerBorder}`, background: t.surface, color: t.dangerInk, width: 36, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Icon size={14} strokeWidth={2.2} path="M3 6h18 M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2 M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                        </button>
-                      )}
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      <div style={{ width: 72, height: 72, flexShrink: 0, borderRadius: 10, overflow: 'hidden', border: `1px solid ${t.inputBorder}`, background: t.surface, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {v.image ? (
+                          <img src={v.image} alt="preview variant" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                        ) : (
+                          <Icon size={20} stroke={t.faint} strokeWidth={1.6} path="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z M8.5 7a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z M21 15l-5-5L5 21" />
+                        )}
+                      </div>
+                      <div style={{ flex: 1, minWidth: isMobile ? '100%' : 220, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          <input value={v.name} onChange={(e) => s.updateVariant(i, { name: e.target.value })} placeholder="Nama variant (mis. Original)" style={{ ...smallInput, flex: 1, minWidth: 140 }} />
+                          <input type="number" value={v.price} onChange={(e) => s.updateVariant(i, { price: parseInt(e.target.value, 10) || 0 })} placeholder="Harga" style={{ ...smallInput, width: isMobile ? '100%' : 110, flex: isMobile ? '1 1 100%' : undefined }} />
+                          {d.variants.length > 1 && (
+                            <button onClick={() => s.removeVariant(i)} title="Hapus variant" style={{ border: `1px solid ${t.dangerBorder}`, background: t.surface, color: t.dangerInk, width: 36, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <Icon size={14} strokeWidth={2.2} path="M3 6h18 M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2 M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                            </button>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <label style={{ border: `1px solid ${t.inputBorder}`, background: t.surface, color: t.ink, fontSize: 11.5, fontWeight: 700, borderRadius: 8, padding: '6px 11px', cursor: 'pointer' }}>
+                            {v.image ? 'Ganti preview' : 'Pilih preview'}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0]
+                                if (file) s.setVariantImageFromFile(i, file)
+                                e.target.value = ''
+                              }}
+                              style={{ display: 'none' }}
+                            />
+                          </label>
+                          {v.image && (
+                            <button onClick={() => s.updateVariant(i, { image: '' })} style={{ border: `1px solid ${t.dangerBorder}`, background: t.surface, color: t.dangerInk, fontSize: 11.5, fontWeight: 700, borderRadius: 8, padding: '6px 10px' }}>
+                              Hapus preview
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     </div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 11.5, fontWeight: 700, color: t.muted }}>Pakai stock</span>
@@ -159,20 +194,22 @@ export function MenuEditorModal() {
                   {addonChoices.map((ac) => {
                     const free = d.freeAddons.includes(ac.id)
                     const paid = d.addons.includes(ac.id)
+                    const canBeFree = ac.variants.length === 1
                     const status = free && paid ? 'Free 1x + add-on berbayar' : free ? 'Free menu' : paid ? 'Add-on berbayar' : fmt(ac.basePrice)
                     return (
                       <div key={ac.id} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr auto', gap: 10, alignItems: 'center', padding: '10px 12px', border: `1px solid ${free || paid ? t.chipColor : t.inputBorder}`, background: free || paid ? t.chipBg : t.surface, borderRadius: 10 }}>
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontSize: 13, fontWeight: 700, overflowWrap: 'anywhere' }}>{ac.name}</div>
                           <div style={{ fontSize: 12.5, color: t.muted, fontWeight: 700, marginTop: 2 }}>{status}</div>
+                          {!canBeFree && <div style={{ fontSize: 11.5, color: t.dangerInk, marginTop: 3 }}>Free hanya tersedia untuk pelengkap dengan tepat satu varian.</div>}
                         </div>
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: isMobile ? 'flex-start' : 'flex-end' }}>
                           <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, border: `1px solid ${paid ? BRAND.terracotta : t.inputBorder}`, background: paid ? BRAND.terracotta : t.surface, color: paid ? '#fff' : t.ink, borderRadius: 8, padding: '7px 10px', cursor: 'pointer' }}>
                             <input type="checkbox" checked={paid} onChange={() => s.toggleAddon(ac.id)} style={{ width: 14, height: 14, accentColor: BRAND.terracotta }} />
                             Berbayar
                           </label>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, border: `1px solid ${free ? BRAND.bamboo : t.inputBorder}`, background: free ? BRAND.bamboo : t.surface, color: free ? '#fff' : t.ink, borderRadius: 8, padding: '7px 10px', cursor: 'pointer' }}>
-                            <input type="checkbox" checked={free} onChange={() => s.toggleFreeAddon(ac.id)} style={{ width: 14, height: 14, accentColor: BRAND.bamboo }} />
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, border: `1px solid ${free ? BRAND.bamboo : t.inputBorder}`, background: free ? BRAND.bamboo : t.surface, color: free ? '#fff' : t.ink, borderRadius: 8, padding: '7px 10px', cursor: canBeFree ? 'pointer' : 'not-allowed', opacity: canBeFree ? 1 : 0.5 }}>
+                            <input type="checkbox" checked={free} disabled={!canBeFree} onChange={() => s.toggleFreeAddon(ac.id)} style={{ width: 14, height: 14, accentColor: BRAND.bamboo }} />
                             Free
                           </label>
                         </div>
