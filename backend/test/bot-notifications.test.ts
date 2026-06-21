@@ -13,6 +13,7 @@ describe('bot notifications', () => {
     expect(await dispatchPreOrderReminders(1)).toEqual({ sent: 1, failed: 0 })
     expect(await dispatchPreOrderReminders(1)).toEqual({ sent: 0, failed: 0 })
     expect(sender).toHaveBeenCalledTimes(1)
+    expect(String(sender.mock.calls[0][1])).toContain('Pekan pengambilan/pengiriman: 22–26 Juni 2026')
     expect(await prisma.preOrderReminderLog.count({ where: { preOrderId: 1, status: 'sent' } })).toBe(1)
     expect(await prisma.botMessage.findFirst({ where: { direction: 'outgoing', preOrderId: 1 } })).toMatchObject({ intent: 'preorder_reminder' })
   })

@@ -2,7 +2,7 @@ import path from 'node:path'
 import { Bot, Context, InlineKeyboard, InputFile, type Context as GrammyContext } from 'grammy'
 import { prisma } from '../db'
 import { config } from '../config'
-import { formatJakarta } from '../time'
+import { formatFulfillmentWeek, formatJakarta } from '../time'
 import {
   BotBusinessError,
   addToCart,
@@ -100,8 +100,9 @@ export function createBot(token = config.botToken): Bot | null {
       const { preOrder, menus } = await listOrderableMenus()
       if (!preOrder) return reply(ctx, `${intro}\n\nSaat ini pre-order belum dibuka ya kak.\n\nKalau kakak mau dikabari saat pre-order berikutnya dibuka, silakan kirim /remind_preorder.`)
       if (!menus.length) return reply(ctx, `${intro}\n\nPre-order sedang dibuka, tapi menu yang bisa dipesan belum tersedia ya kak.\nSilakan cek lagi nanti.`)
+      const fulfillmentWeek = formatFulfillmentWeek(preOrder.fulfillmentStartDate, preOrder.fulfillmentEndDate)
       return reply(ctx, [intro, '', 'Pre-order sedang dibuka ya kak 🎉', '', preOrder.title, preOrder.description,
-        preOrder.fulfillmentDate ? `Pengambilan/pengiriman: ${formatJakarta(preOrder.fulfillmentDate)}` : null,
+        fulfillmentWeek ? `Pekan pengambilan/pengiriman: ${fulfillmentWeek}` : null,
         preOrder.fulfillmentNote ? `Catatan: ${preOrder.fulfillmentNote}` : null, '', 'Kalau kakak mau pesan, silakan kirim /order ya.'].filter(Boolean).join('\n'))
     })
   })
@@ -325,7 +326,10 @@ async function showOrderList(ctx: Context, user: TelegramCustomer, requestedPage
 async function showOrderDetail(ctx: Context, user: TelegramCustomer, orderId: number, page: number, editing: boolean) {
   const order = await customerOrderDetail(user.id, orderId)
   const lines = [`Detail order ${order.orderCode}`, '', `Status: ${statusLabel(order.orderStatus)}`, 'Pembayaran: COD', `Status pembayaran: ${paymentLabel(order.paymentStatus)}`, `Total: ${money(order.totalAmount)}`, `Dibuat: ${formatJakarta(order.createdAt)}`, `Terakhir diperbarui: ${formatJakarta(order.updatedAt)}`]
-  if (order.preOrder) lines.push('', 'Pre-order:', order.preOrder.title ?? '', ...(order.preOrder.fulfillmentDate ? [`Jadwal: ${formatJakarta(order.preOrder.fulfillmentDate)}`] : []), ...(order.preOrder.fulfillmentNote ? [`Catatan: ${order.preOrder.fulfillmentNote}`] : []))
+  if (order.preOrder) {
+    const fulfillmentWeek = formatFulfillmentWeek(order.preOrder.fulfillmentStartDate, order.preOrder.fulfillmentEndDate)
+    lines.push('', 'Pre-order:', order.preOrder.title ?? '', ...(fulfillmentWeek ? [`Pekan pengambilan/pengiriman: ${fulfillmentWeek}`] : []), ...(order.preOrder.fulfillmentNote ? [`Catatan: ${order.preOrder.fulfillmentNote}`] : []))
+  }
   if (order.adminNotes) lines.push('', 'Catatan admin:', order.adminNotes)
   lines.push('', 'Item:')
   order.items.filter((item) => item.parentOrderItemId == null).forEach((item, index) => {

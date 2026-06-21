@@ -21,14 +21,25 @@ describe('preorders', () => {
   })
 
   it('create draft → 201, stats 0', async () => {
-    const res = await app.inject({ method: 'POST', url: '/api/preorders', headers: authH(token), payload: { title: 'PO Baru', fulfillmentDate: '2026-07-01T05:00:00Z' } })
+    const res = await app.inject({ method: 'POST', url: '/api/preorders', headers: authH(token), payload: { title: 'PO Baru', fulfillmentWeek: '2026-W26' } })
     expect(res.statusCode).toBe(201)
-    expect(data(res)).toMatchObject({ title: 'PO Baru', status: 'draft', orderCount: 0, revenue: 0 })
+    expect(data(res)).toMatchObject({
+      title: 'PO Baru', status: 'draft', orderCount: 0, revenue: 0,
+      fulfillmentStartDate: '2026-06-21T17:00:00.000Z',
+      fulfillmentEndDate: '2026-06-25T17:00:00.000Z',
+    })
   })
 
   it('create tanpa judul → 400', async () => {
     const res = await app.inject({ method: 'POST', url: '/api/preorders', headers: authH(token), payload: {} })
     expect(res.statusCode).toBe(400)
+  })
+
+  it('create tanpa pekan atau dengan ISO week tidak valid → 400', async () => {
+    const missing = await app.inject({ method: 'POST', url: '/api/preorders', headers: authH(token), payload: { title: 'PO Baru' } })
+    const invalid = await app.inject({ method: 'POST', url: '/api/preorders', headers: authH(token), payload: { title: 'PO Baru', fulfillmentWeek: '2025-W53' } })
+    expect(missing.statusCode).toBe(400)
+    expect(invalid.statusCode).toBe(400)
   })
 
   it('open saat sudah ada PO open → 409', async () => {

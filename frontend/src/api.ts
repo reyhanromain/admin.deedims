@@ -120,6 +120,22 @@ function fmtDay(iso: string | null | undefined): string {
   return new Intl.DateTimeFormat('en-GB', { timeZone: TZ, day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(iso))
 }
 
+/** Format Senin-Jumat dalam bahasa Indonesia, mis. "22–26 Juni 2026". */
+export function fmtFulfillmentWeek(startIso: string | null | undefined, endIso: string | null | undefined): string {
+  if (!startIso || !endIso) return 'TBD'
+  const parts = (iso: string) => {
+    const values = new Intl.DateTimeFormat('en-US', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(iso))
+    const value = (type: Intl.DateTimeFormatPartTypes) => Number(values.find((part) => part.type === type)?.value)
+    return { year: value('year'), month: value('month'), day: value('day') }
+  }
+  const month = (iso: string) => new Intl.DateTimeFormat('id-ID', { timeZone: TZ, month: 'long' }).format(new Date(iso))
+  const start = parts(startIso)
+  const end = parts(endIso)
+  if (start.year === end.year && start.month === end.month) return `${start.day}–${end.day} ${month(endIso)} ${end.year}`
+  if (start.year === end.year) return `${start.day} ${month(startIso)}–${end.day} ${month(endIso)} ${end.year}`
+  return `${start.day} ${month(startIso)} ${start.year}–${end.day} ${month(endIso)} ${end.year}`
+}
+
 // ── Mappers (DTO API → tipe FE) ──────────────────────────
 export const mapStock = (r: any): StockItem => ({ id: r.id, label: r.label, name: r.name, quantity: r.quantity, unit: r.unit ?? 'pcs' })
 
@@ -133,7 +149,7 @@ export const mapMenu = (r: any): Menu => ({
 
 export const mapPreorderRow = (r: any): PreorderRow => ({
   id: r.id, title: r.title ?? '', description: r.description ?? '—', status: r.status,
-  date: r.fulfillmentDate ? fmtDay(r.fulfillmentDate) : 'TBD', note: r.fulfillmentNote ?? '—',
+  fulfillmentWeek: fmtFulfillmentWeek(r.fulfillmentStartDate, r.fulfillmentEndDate), note: r.fulfillmentNote ?? '—',
   orderCount: r.orderCount ?? 0, revenue: r.revenue ?? 0,
 })
 
@@ -154,7 +170,7 @@ export const mapOrderDetail = (r: any): OrderDetail => ({
     addon: it.variantNameSnapshot === 'Add-on',
   })),
   poTitle: r.preOrder?.title ?? '—',
-  poDate: r.preOrder?.fulfillmentDate ? fmtDay(r.preOrder.fulfillmentDate) : '—',
+  poFulfillmentWeek: r.preOrder ? fmtFulfillmentWeek(r.preOrder.fulfillmentStartDate, r.preOrder.fulfillmentEndDate) : '—',
 })
 
 export const mapCustomerRow = (r: any): CustomerRow => ({
@@ -199,7 +215,7 @@ export const mapUser = (r: any): User => ({ id: r.id, username: r.username, name
 export const mapDashboard = (r: any): DashboardData => ({
   kpis: r.kpis,
   openPreorder: r.openPreorder
-    ? { id: r.openPreorder.id, title: r.openPreorder.title, date: r.openPreorder.fulfillmentDate ? fmtDay(r.openPreorder.fulfillmentDate) : 'TBD', note: r.openPreorder.fulfillmentNote ?? '—' }
+    ? { id: r.openPreorder.id, title: r.openPreorder.title, fulfillmentWeek: fmtFulfillmentWeek(r.openPreorder.fulfillmentStartDate, r.openPreorder.fulfillmentEndDate), note: r.openPreorder.fulfillmentNote ?? '—' }
     : null,
   recentOrders: (r.recentOrders ?? []).map((o: any) => ({ id: o.id, code: o.code, customer: o.customer ?? '', itemsSummary: o.itemsSummary ?? '', total: o.total, status: o.status })),
   lowStock: (r.lowStock ?? []).map((s: any) => ({ id: s.id, name: s.name, quantity: s.quantity, unit: s.unit ?? 'pcs' })),

@@ -31,14 +31,14 @@ const getTokenMock = apiMod.getToken as ReturnType<typeof vi.fn>
 const paged = (rows: any[], extra: Record<string, unknown> = {}) => ({ rows, total: rows.length, page: 1, limit: 20, totalPages: 1, ...extra })
 
 const orderRow = { id: 1, code: 'DD-1', customer: 'Sari', username: 'sari', createdAt: '12 Jun, 09:13', itemsSummary: 'Menu A x1', total: 10000, status: 'confirmed', pay: 'pending', cancelRequested: true }
-const orderDetail = { id: 1, code: 'DD-1', customer: 'Sari', username: 'sari', createdAt: '12 Jun, 09:13', updatedAt: '12 Jun, 10:00', status: 'confirmed', pay: 'pending', adminNotes: '', cancelRequested: true, total: 10000, items: [{ name: 'Menu A', meta: '', qty: 1, price: 10000, addon: false }], poTitle: 'PO Open', poDate: '14 Jun 2026' }
+const orderDetail = { id: 1, code: 'DD-1', customer: 'Sari', username: 'sari', createdAt: '12 Jun, 09:13', updatedAt: '12 Jun, 10:00', status: 'confirmed', pay: 'pending', adminNotes: '', cancelRequested: true, total: 10000, items: [{ name: 'Menu A', meta: '', qty: 1, price: 10000, addon: false }], poTitle: 'PO Open', poFulfillmentWeek: '22–26 Juni 2026' }
 const menuRow = { id: 1, name: 'Menu A', description: '', basePrice: 10000, unitLabel: '', active: true, isAddon: false, image: '', variants: [{ name: 'Reg', price: 10000, stockId: 1, qty: 2, image: '' }], addons: [2], freeAddons: [] }
 const stockRow = { id: 1, label: 's1', name: 'Stock 1', quantity: 50, unit: 'pcs' }
-const poOpen = { id: 1, title: 'PO Open', description: '', status: 'open', date: '14 Jun 2026', note: '', orderCount: 1, revenue: 10000 }
-const poDraft = { id: 2, title: 'PO Draft', description: '', status: 'draft', date: 'TBD', note: '—', orderCount: 0, revenue: 0 }
+const poOpen = { id: 1, title: 'PO Open', description: '', status: 'open', fulfillmentWeek: '22–26 Juni 2026', note: '', orderCount: 1, revenue: 10000 }
+const poDraft = { id: 2, title: 'PO Draft', description: '', status: 'draft', fulfillmentWeek: 'TBD', note: '—', orderCount: 0, revenue: 0 }
 const custRow = { id: 1, username: 'sari', name: 'Sari', blocked: false, joined: '02 May 2026', orderCount: 1, totalSpent: 10000, lastOrder: '12 Jun, 09:13', reminderActive: true }
 const users = [{ id: 1, username: 'admin', name: 'Dee Rahma', password: '', super: true }, { id: 2, username: 'staff', name: 'Staff', password: '', super: false }]
-const dashboard = { kpis: { newOrders: 0, batchOrders: 1, batchRevenue: 10000, cancelRequests: 1 }, openPreorder: { id: 1, title: 'PO Open', date: '14 Jun 2026', note: 'n' }, recentOrders: [{ id: 1, code: 'DD-1', customer: 'Sari', itemsSummary: 'Menu A x1', total: 10000, status: 'submitted' }], lowStock: [{ id: 2, name: 'Stock 2', quantity: 5, unit: 'pcs' }] }
+const dashboard = { kpis: { newOrders: 0, batchOrders: 1, batchRevenue: 10000, cancelRequests: 1 }, openPreorder: { id: 1, title: 'PO Open', fulfillmentWeek: '22–26 Juni 2026', note: 'n' }, recentOrders: [{ id: 1, code: 'DD-1', customer: 'Sari', itemsSummary: 'Menu A x1', total: 10000, status: 'submitted' }], lowStock: [{ id: 2, name: 'Stock 2', quantity: 5, unit: 'pcs' }] }
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -171,6 +171,20 @@ describe('preorders single-open', () => {
     act(() => r.current.openPreorder(2))
     await waitFor(() => expect(r.current.toast).toContain('hanya boleh satu open'))
     expect(api.openPreorder).not.toHaveBeenCalled()
+  })
+
+  it('createPo mewajibkan pekan dan mengirim ISO week', async () => {
+    api.createPreorder.mockResolvedValue({ id: 3, title: 'PO Baru', description: null, status: 'draft', fulfillmentStartDate: '2026-06-21T17:00:00Z', fulfillmentEndDate: '2026-06-25T17:00:00Z', fulfillmentNote: null, orderCount: 0, revenue: 0 })
+    const r = await mountAuthed()
+    await goto(r, 'preorders')
+    act(() => r.current.set({ poTitle: 'PO Baru' }))
+    act(() => r.current.createPo())
+    expect(api.createPreorder).not.toHaveBeenCalled()
+    expect(r.current.toast).toContain('Pekan')
+
+    act(() => r.current.set({ poWeek: '2026-W26' }))
+    act(() => r.current.createPo())
+    await waitFor(() => expect(api.createPreorder).toHaveBeenCalledWith(expect.objectContaining({ title: 'PO Baru', fulfillmentWeek: '2026-W26' })))
   })
 })
 
