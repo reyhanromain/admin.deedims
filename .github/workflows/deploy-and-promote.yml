@@ -5,18 +5,29 @@ on:
     branches:
       - dev
       - main
+  pull_request_target:
+    branches:
+      - dev
+    types:
+      - labeled
+  workflow_dispatch:
+    inputs:
+      change_branch:
+        description: Change branch already merged and UAT-passed in dev
+        required: true
 
 permissions:
   contents: write
   pull-requests: write
 
 concurrency:
-  group: deploy-${{ github.ref_name }}
+  group: deploy-${{ github.ref_name }}-${{ github.event_name }}
   cancel-in-progress: false
 
 jobs:
   deploy:
     name: Deploy ${{ github.ref_name == 'dev' && 'staging' || 'production' }}
+    if: github.event_name == 'push'
     runs-on:
       - self-hosted
       - Linux
@@ -39,24 +50,49 @@ jobs:
 
   promote:
     name: Promote tested branch to main
-    if: github.ref_name == 'dev'
-    needs: deploy
+    if: >-
+      (github.event_name == 'pull_request_target' &&
+       github.event.label.name == 'uat-passed' &&
+       github.event.pull_request.base.ref == 'dev') ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - name: Open production PR from the tested change branch
+      - name: Open production PR after UAT sign-off
         env:
           GH_TOKEN: ${{ secrets.DEEDIMS_AUTOMATION_TOKEN }}
           REPOSITORY: ${{ github.repository }}
-          MERGE_SHA: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_HEAD: ${{ github.event.pull_request.head.ref }}
+          PR_MERGED: ${{ github.event.pull_request.merged }}
+          DISPATCH_BRANCH: ${{ github.event.inputs.change_branch }}
         run: |
-          head_branch=$(gh api \
-            -H 'Accept: application/vnd.github+json' \
-            "repos/$REPOSITORY/commits/$MERGE_SHA/pulls" \
-            --jq 'map(select(.base.ref == "dev" and .merged_at != null))[0].head.ref // empty')
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            head_branch="$DISPATCH_BRANCH"
+          else
+            if [ "$PR_MERGED" != "true" ]; then
+              echo 'UAT sign-off ignored: the change branch is not merged into dev yet.'
+              exit 0
+            fi
+            head_branch="$PR_HEAD"
+          fi
 
           if [ -z "$head_branch" ] || [ "$head_branch" = "main" ]; then
             echo 'No change branch requires production promotion.'
             exit 0
+          fi
+
+          if ! git ls-remote --exit-code --heads "https://github.com/$REPOSITORY.git" "$head_branch" >/dev/null 2>&1; then
+            echo "Promotion rejected: branch $head_branch no longer exists."
+            exit 1
+          fi
+
+          merged_in_dev=$(gh api \
+            -H 'Accept: application/vnd.github+json' \
+            "repos/$REPOSITORY/compare/dev...$head_branch" \
+            --jq '.status')
+          if [ "$merged_in_dev" != "identical" ] && [ "$merged_in_dev" != "behind" ]; then
+            echo "Promotion rejected: $head_branch head is not contained in dev (status: $merged_in_dev)."
+            exit 1
           fi
 
           existing=$(gh pr list --repo "$REPOSITORY" --base main --head "$head_branch" --state open --json number --jq '.[0].number // empty')
@@ -68,7 +104,7 @@ jobs:
               --base main \
               --head "$head_branch" \
               --title "promote: $head_branch to production" \
-              --body "Automated production promotion after the exact change-branch head was merged into dev and the staging deployment passed.")
+              --body "Automated production promotion after explicit UAT sign-off in dev.")
             pr_number=${pr_url##*/}
           fi
 
@@ -76,7 +112,7 @@ jobs:
 
   sync-dev:
     name: Synchronize production baseline to dev
-    if: github.ref_name == 'main'
+    if: github.event_name == 'push' && github.ref_name == 'main'
     needs: deploy
     runs-on: ubuntu-latest
     steps:
