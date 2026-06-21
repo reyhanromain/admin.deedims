@@ -30,6 +30,15 @@ jobs:
           git fetch origin main:refs/remotes/origin/main
           git fetch origin dev:refs/remotes/origin/dev
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
       - name: Validate source and promotion order
         env:
           BASE_BRANCH: ${{ github.base_ref }}
@@ -62,3 +71,24 @@ jobs:
               exit 1
             }
           fi
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Verify backend
+        working-directory: backend
+        run: |
+          npm run prisma:generate
+          npm run typecheck
+          npm test
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Verify frontend
+        working-directory: frontend
+        run: |
+          npm test
+          npm run build

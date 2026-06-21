@@ -62,7 +62,7 @@ export async function ordersRoutes(app: FastifyInstance) {
       items: order.items.map((it) => ({
         menuNameSnapshot: it.menuNameSnapshot, variantNameSnapshot: it.variantNameSnapshot, unitPrice: it.unitPrice, quantity: it.quantity,
       })),
-      preOrder: order.preOrder ? { title: order.preOrder.title, fulfillmentDate: order.preOrder.fulfillmentDate } : null,
+      preOrder: order.preOrder ? { title: order.preOrder.title, fulfillmentStartDate: order.preOrder.fulfillmentStartDate, fulfillmentEndDate: order.preOrder.fulfillmentEndDate } : null,
     })
   })
 

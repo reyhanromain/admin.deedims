@@ -63,7 +63,7 @@ export interface Preorder {
   title: string
   description: string
   status: PoStatus
-  date: string
+  fulfillmentWeek: string
   note: string
 }
 
@@ -151,7 +151,7 @@ export interface OrderDetail {
   total: number
   items: OrderItem[]
   poTitle: string
-  poDate: string
+  poFulfillmentWeek: string
 }
 
 export interface PreorderRow extends Preorder {
@@ -189,7 +189,7 @@ export interface LowStockItem {
 
 export interface DashboardData {
   kpis: { newOrders: number; batchOrders: number; batchRevenue: number; cancelRequests: number }
-  openPreorder: { id: number; title: string; date: string; note: string } | null
+  openPreorder: { id: number; title: string; fulfillmentWeek: string; note: string } | null
   recentOrders: Array<{ id: number; code: string; customer: string; itemsSummary: string; total: number; status: OrderStatus }>
   lowStock: LowStockItem[]
 }

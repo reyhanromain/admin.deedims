@@ -14,6 +14,23 @@ environment.
 Never develop directly on `main` or `dev`. Do not merge `dev` into `main`,
 because that can release other changes that have not finished testing.
 
+This is a hard gate, including for automated coding agents. Before the first
+edit, inspect the active branch and working tree, create the change branch when
+needed, and run the repository preflight:
+
+```bash
+git branch --show-current
+git status --short
+scripts/git-preflight.sh
+```
+
+Install the tracked hooks once per clone. They reject commits made on a
+long-lived branch and direct pushes to either protected branch:
+
+```bash
+scripts/setup-git-hooks.sh
+```
+
 Branch prefixes:
 
 - `feat/` for user-facing features.
@@ -40,18 +57,22 @@ git switch -c feat/preorder-cancellation-report
 git push -u origin feat/preorder-cancellation-report
 ```
 
-3. Open a PR from the change branch to `dev`. Merge it with a **merge commit**.
-   Do not squash, rebase-merge, or delete the branch yet. This preserves the
-   exact tested commit for the production gate.
+3. Open a PR from the change branch to `dev`. Automation enables auto-merge
+   with a **merge commit**; required checks must pass before it merges. Do not
+   squash, rebase-merge, or delete the branch yet. This preserves the exact
+   tested commit for the production gate.
 
-4. Test the integrated application on `dev`.
+4. The `dev` merge automatically rebuilds and health-checks staging from
+   `dev` on the dedicated deployment runner.
 
-5. If testing passes, open a second PR from the same change branch directly to
-   `main`. Merge it, then delete the change branch.
+5. After staging succeeds, automation opens a second PR from the same change
+   branch directly to `main` and enables auto-merge. Required checks verify
+   that the exact branch head already exists in `dev`.
 
-6. Synchronize `dev` after the production merge if GitHub reports branch
-   divergence. Use a PR from `main` to `dev`; never rewrite either long-lived
-   branch.
+6. The `main` merge automatically rebuilds, backs up, deploys, and
+   health-checks production from `main`. Automation then synchronizes `main`
+   back to `dev` through an auto-merged PR when the histories diverge; neither
+   long-lived branch is rewritten.
 
 If a fix is required during `dev` testing, commit it to the same change branch,
 merge that updated branch into `dev` again, and repeat testing. The PR to `main`
@@ -64,6 +85,13 @@ The repository workflow validates these rules automatically:
   `dev`.
 - The exact change-branch head must already exist in `dev` before it can enter
   `main`.
+- Backend and frontend quality checks must pass before either protected branch
+  can be merged.
+- Branch protection applies to administrators too, so repository owners cannot
+  accidentally bypass the PR gates.
+- PRs use merge commits and auto-merge only after required checks succeed.
+- Deployment jobs run only after pushes to protected `dev` or `main`; pull
+  request code never executes on the deployment host.
 
 ## Commits
 

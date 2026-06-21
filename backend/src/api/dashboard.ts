@@ -46,7 +46,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
     return ok({
       kpis: { newOrders, batchOrders, batchRevenue, cancelRequests },
       openPreorder: openPo
-        ? { id: openPo.id, title: openPo.title, fulfillmentDate: openPo.fulfillmentDate, fulfillmentNote: openPo.fulfillmentNote }
+        ? { id: openPo.id, title: openPo.title, fulfillmentStartDate: openPo.fulfillmentStartDate, fulfillmentEndDate: openPo.fulfillmentEndDate, fulfillmentNote: openPo.fulfillmentNote }
         : null,
       recentOrders,
       lowStock,

@@ -292,8 +292,9 @@ model PreOrder {
   status          String    @default("draft") // draft|open|closed|completed|cancelled
   openedAt        DateTime? @map("opened_at")
   closedAt        DateTime? @map("closed_at")
-  fulfillmentDate DateTime? @map("fulfillment_date")
-  fulfillmentNote String?   @map("fulfillment_note")
+  fulfillmentStartDate DateTime? @map("fulfillment_start_date") // Senin pekan fulfillment
+  fulfillmentEndDate   DateTime? @map("fulfillment_end_date")   // Jumat pekan fulfillment
+  fulfillmentNote      String?   @map("fulfillment_note")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
