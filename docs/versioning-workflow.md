@@ -65,11 +65,28 @@ git push -u origin feat/preorder-cancellation-report
 4. The `dev` merge automatically rebuilds and health-checks staging from
    `dev` on the dedicated deployment runner.
 
-5. After staging succeeds, automation opens a second PR from the same change
-   branch directly to `main` and enables auto-merge. Required checks verify
-   that the exact branch head already exists in `dev`.
+5. After staging succeeds, **automation stops and waits for explicit UAT
+   sign-off**. Staging being green is not approval; it only means the rebuild
+   and health check passed. Run UAT against staging yourself.
 
-6. The `main` merge automatically rebuilds, backs up, deploys, and
+6. When UAT passes, give the sign-off signal on the change branch's `dev` PR:
+
+   ```bash
+   gh pr edit <dev-pr-number> --add-label uat-passed
+   ```
+
+   You can also trigger promotion manually for an already merged and
+   UAT-passed branch:
+
+   ```bash
+   gh workflow run "Deploy and promote" -f change_branch=<change-branch>
+   ```
+
+   Only after this signal does automation open a second PR from the same change
+   branch directly to `main` and enable auto-merge. Required checks verify that
+   the exact branch head already exists in `dev`.
+
+7. The `main` merge automatically rebuilds, backs up, deploys, and
    health-checks production from `main`. Automation then synchronizes `main`
    back to `dev` through an auto-merged PR when the histories diverge; neither
    long-lived branch is rewritten.
