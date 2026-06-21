@@ -4,7 +4,7 @@ import { fmt, initials } from '../format'
 import { cardStyle, mobileMetaGrid, mobileStatStyle, tableHeadStyle } from '../styles'
 import { HoverButton, Hoverable, Icon, Pill } from '../ui'
 import { Pager } from '../components/Pager'
-import type { CustomerOrderRow, CustomerRow } from '../types'
+import type { CustomerRow } from '../types'
 import { useIsMobile } from '../responsive'
 
 const GRID = 'minmax(180px, 1fr) 72px 130px 140px 100px'
@@ -16,7 +16,7 @@ export function Customers() {
   const po = poStatusBadge(s.dark)
   const inactive = inactiveBadge(s.dark)
   const list = s.lists.customers
-  const rows = list.rows as CustomerRow[]
+  const rows = list.rows
 
   const selC = rows.find((c) => c.username === s.selectedCustomerU) || null
   if (selC) return <CustomerDetail customer={selC} />
@@ -118,7 +118,7 @@ function CustomerDetail({ customer }: { customer: CustomerRow }) {
   const subBg = customer.reminderActive ? po.open.bg : inactive.bg
   const subColor = customer.reminderActive ? po.open.color : t.muted
   const subText = customer.reminderActive ? 'Aktif' : 'Tidak'
-  const orders = s.customerOrders.rows as CustomerOrderRow[]
+  const orders = s.customerOrders.rows
 
   return (
     <section>

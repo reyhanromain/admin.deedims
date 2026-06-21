@@ -12,7 +12,7 @@ export function BotMessages() {
   const t = getTheme(s.dark)
   const isMobile = useIsMobile()
   const list = s.lists.botMessages
-  const rows = list.rows as BotMessage[]
+  const rows = list.rows
   const orderedRows = useMemo(() => [...rows].reverse(), [rows])
   const threadRef = useRef<HTMLDivElement>(null)
 

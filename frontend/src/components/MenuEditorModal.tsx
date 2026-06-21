@@ -3,7 +3,6 @@ import { getTheme, BRAND } from '../theme'
 import { fmt } from '../format'
 import { inputStyle, labelStyle } from '../styles'
 import { HoverButton, Icon } from '../ui'
-import type { Menu, StockItem } from '../types'
 import { useIsMobile } from '../responsive'
 
 export function MenuEditorModal() {
@@ -14,8 +13,8 @@ export function MenuEditorModal() {
   if (s.editMenuId === null || !d) return null
 
   const title = s.editMenuId === 'new' ? 'Menu baru' : 'Edit menu'
-  const stockRows = s.lists.stock.rows as StockItem[]
-  const addonChoices = (s.lists.menus.rows as Menu[]).filter((x) => x.isAddon && x.id !== d.id)
+  const stockRows = s.lists.stock.rows
+  const addonChoices = s.lists.menus.rows.filter((x) => x.isAddon && x.id !== d.id)
 
   const smallInput = { padding: '9px 11px', border: `1px solid ${t.inputBorder}`, borderRadius: 9, fontSize: 13, color: t.ink, outline: 'none', background: t.surface } as const
 

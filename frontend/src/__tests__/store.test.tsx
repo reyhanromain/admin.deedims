@@ -199,13 +199,13 @@ describe('preorder drill-down', () => {
 })
 
 describe('patchOrder', () => {
-  it('cancelRequested:false + cancelled → approveCancel + refetch detail', async () => {
+  it('approveCancellation → approveCancel + refetch detail', async () => {
     api.approveCancel.mockResolvedValue({ status: 'approved' })
     const r = await mountAuthed()
     await goto(r, 'orders')
     act(() => r.current.selectOrder(1))
     await waitFor(() => expect(r.current.selectedOrder?.id).toBe(1))
-    act(() => r.current.patchOrder(1, { status: 'cancelled', pay: 'cancelled', cancelRequested: false }))
+    act(() => r.current.approveCancellation(1))
     await waitFor(() => expect(api.approveCancel).toHaveBeenCalledWith(1))
     expect(api.rejectCancel).not.toHaveBeenCalled()
   })

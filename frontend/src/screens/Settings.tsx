@@ -3,7 +3,6 @@ import { getTheme, BRAND } from '../theme'
 import { cardStyle, inputStyle } from '../styles'
 import { HoverButton } from '../ui'
 import { Pager } from '../components/Pager'
-import type { Setting } from '../types'
 
 export function Settings() {
   const s = useAdmin()
@@ -14,7 +13,7 @@ export function Settings() {
     <section style={{ maxWidth: 640, width: '100%' }}>
       <p style={{ margin: '0 0 16px 0', fontSize: 13.5, color: t.muted }}>Konfigurasi bot yang bisa diubah tanpa deploy ulang.</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {(list.rows as Setting[]).map((st, i) => (
+        {list.rows.map((st, i) => (
           <div key={st.label} style={cardStyle(t, { padding: '18px 20px' })}>
             <label style={{ fontSize: 13, fontWeight: 700, fontFamily: 'monospace' }}>{st.label}</label>
             <div style={{ fontSize: 12, color: t.faint, margin: '4px 0 10px 0' }}>{st.desc}</div>
