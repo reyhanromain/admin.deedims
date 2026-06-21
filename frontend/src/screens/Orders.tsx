@@ -7,7 +7,8 @@ import { Pager } from '../components/Pager'
 import type { OrderRow, OrderStatus } from '../types'
 import { useIsMobile } from '../responsive'
 
-const GRID = '120px 1.4fr 1fr 100px 150px 120px'
+const GRID = '230px minmax(220px, 1.2fr) minmax(300px, 1.5fr) 110px 150px 130px'
+const TABLE_MIN_WIDTH = 1180
 
 export function Orders() {
   const s = useAdmin()
@@ -88,7 +89,7 @@ export function Orders() {
         </div>
       ) : (
         <div style={cardStyle(t, { overflowX: 'auto' })}>
-          <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 12, ...tableHeadStyle(t, 820) }}>
+          <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 12, ...tableHeadStyle(t, TABLE_MIN_WIDTH) }}>
             <div>Kode</div><div>Customer</div><div>Item</div>
             <div style={{ textAlign: 'right' }}>Total</div><div>Status</div><div>Pembayaran</div>
           </div>
@@ -101,26 +102,26 @@ export function Orders() {
                 style={{
                   display: 'grid', gridTemplateColumns: GRID, gap: 12, padding: '14px 20px',
                   borderBottom: `1px solid ${t.rowBorder}`, alignItems: 'center', cursor: 'pointer',
-                  background: flagged ? t.cancelRowBg : t.surface, minWidth: 820,
+                  background: flagged ? t.cancelRowBg : t.surface, minWidth: TABLE_MIN_WIDTH,
                 }}
                 hover={{ filter: 'brightness(0.98)' }}
               >
-                <div style={{ fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 7 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, overflowWrap: 'anywhere', lineHeight: 1.35 }}>
                   {o.code}
                   {o.cancelRequested && (
                     <Icon size={13} stroke={BRAND.terracotta} strokeWidth={2.4} title="Cancel request" path="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z M4 22v-7" />
                   )}
                 </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 600 }}>{o.customer}</div>
-                  <div style={{ fontSize: 12, color: t.faint }}>@{o.username} · {o.createdAt}</div>
+                <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.customer}</div>
+                  <div style={{ fontSize: 12, color: t.faint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{o.username} · {o.createdAt}</div>
                 </div>
                 <div style={{ fontSize: 12.5, color: t.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {o.itemsSummary}
                 </div>
-                <div style={{ fontSize: 13.5, fontWeight: 700, textAlign: 'right' }}>{fmt(o.total)}</div>
-                <div><Pill bg={status[o.status].bg} color={status[o.status].color}>{status[o.status].label}</Pill></div>
-                <div><span style={{ color: pay[o.pay].color, fontSize: 12, fontWeight: 700 }}>{pay[o.pay].label}</span></div>
+                <div style={{ fontSize: 13.5, fontWeight: 700, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmt(o.total)}</div>
+                <div style={{ whiteSpace: 'nowrap' }}><Pill bg={status[o.status].bg} color={status[o.status].color}>{status[o.status].label}</Pill></div>
+                <div style={{ whiteSpace: 'nowrap' }}><span style={{ color: pay[o.pay].color, fontSize: 12, fontWeight: 700 }}>{pay[o.pay].label}</span></div>
               </Hoverable>
             )
           })}
