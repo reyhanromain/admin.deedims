@@ -66,11 +66,24 @@ export function isoWeekRangeLabel(value: string): string {
   return `${sd} ${ID_MONTHS[sm]} ${sy}–${ed} ${ID_MONTHS[em]} ${ey}`
 }
 
-/** Daftar ISO week ke depan mulai pekan yang memuat `from` (default: hari ini). */
+/** Weekday (1=Mon..7=Sun) of a date evaluated in Asia/Jakarta. */
+function jakartaWeekday(date: Date): number {
+  const name = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Jakarta', weekday: 'short' }).format(date)
+  const map: Record<string, number> = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 }
+  return map[name] ?? 1
+}
+
+/**
+ * Daftar ISO week yang masih bisa dipakai untuk fulfillment, mulai pekan yang
+ * memuat `from`. Jika `from` sudah melewati Jumat (Sabtu/Minggu di Asia/Jakarta),
+ * pekan berjalan dilewati karena rentang Senin–Jumat-nya sudah habis.
+ */
 export function upcomingIsoWeeks(count: number, from: Date = new Date()): { value: string; label: string }[] {
-  const base = isoWeekToMonday(dateToIsoWeek(from))
+  const startMonday = isoWeekToMonday(dateToIsoWeek(from))
   const weeks: { value: string; label: string }[] = []
-  if (!base) return weeks
+  if (!startMonday) return weeks
+  const base = new Date(startMonday)
+  if (jakartaWeekday(from) > 5) base.setUTCDate(base.getUTCDate() + 7)
   for (let i = 0; i < count; i++) {
     const monday = new Date(base)
     monday.setUTCDate(base.getUTCDate() + i * 7)

@@ -36,11 +36,27 @@ describe('isoWeekRangeLabel', () => {
 })
 
 describe('upcomingIsoWeeks', () => {
-  it('starts at the week containing the reference date', () => {
-    const list = upcomingIsoWeeks(3, new Date(Date.UTC(2026, 5, 24)))
+  it('on a weekday, starts at the current week', () => {
+    const list = upcomingIsoWeeks(3, new Date(Date.UTC(2026, 5, 24, 5)))
     expect(list[0].value).toBe('2026-W26')
     expect(list[0].label).toBe('22–26 Juni 2026')
     expect(list).toHaveLength(3)
     expect(list[2].value).toBe('2026-W28')
+  })
+  it('on Friday, still offers the current week', () => {
+    const list = upcomingIsoWeeks(2, new Date(Date.UTC(2026, 5, 26, 5)))
+    expect(list[0].value).toBe('2026-W26')
+    expect(list[0].label).toBe('22–26 Juni 2026')
+  })
+  it('on Saturday, skips the current week (range already over)', () => {
+    const list = upcomingIsoWeeks(2, new Date(Date.UTC(2026, 5, 27, 5)))
+    expect(list[0].value).toBe('2026-W27')
+    expect(list[0].label).toBe('29 Juni–3 Juli 2026')
+  })
+  it('on Sunday in Asia/Jakarta, skips the current week', () => {
+    // 2026-06-21 08:10Z is Sunday 15:10 WIB → current week 2026-W25 skipped.
+    const list = upcomingIsoWeeks(1, new Date(Date.UTC(2026, 5, 21, 8, 10)))
+    expect(list[0].value).toBe('2026-W26')
+    expect(list[0].label).toBe('22–26 Juni 2026')
   })
 })
