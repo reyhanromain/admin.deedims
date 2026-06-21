@@ -4,7 +4,6 @@ import { initials } from '../format'
 import { cardStyle, inputStyle, labelStyle, tableHeadStyle } from '../styles'
 import { HoverButton, Icon } from '../ui'
 import { Pager } from '../components/Pager'
-import type { User } from '../types'
 import { useIsMobile } from '../responsive'
 
 const GRID = '1.7fr 1.1fr 1fr 150px'
@@ -59,7 +58,7 @@ export function Users() {
 
       {isMobile ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {(list.rows as User[]).map((u) => (
+          {list.rows.map((u) => (
             <div key={u.username} style={cardStyle(t, { padding: 14 })}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0, marginBottom: 12 }}>
                 <div style={{ width: 40, height: 40, flexShrink: 0, borderRadius: 99, background: t.chipBg, color: t.chipColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800 }}>
@@ -105,7 +104,7 @@ export function Users() {
           <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 12, ...tableHeadStyle(t, 660) }}>
             <div>Admin</div><div>Username</div><div>Password</div><div style={{ textAlign: 'right' }}>Aksi</div>
           </div>
-          {(list.rows as User[]).map((u) => (
+          {list.rows.map((u) => (
             <div key={u.username} style={{ display: 'grid', gridTemplateColumns: GRID, gap: 12, padding: '13px 20px', borderBottom: `1px solid ${t.rowBorder}`, alignItems: 'center', minWidth: 660 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
                 <div style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 99, background: t.chipBg, color: t.chipColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800 }}>

@@ -2,7 +2,6 @@ import { useAdmin } from '../store'
 import { getTheme, poStatusBadge, inactiveBadge } from '../theme'
 import { cardStyle, tableHeadStyle } from '../styles'
 import { Pager } from '../components/Pager'
-import type { Subscriber } from '../types'
 import { useIsMobile } from '../responsive'
 
 const GRID = '1.4fr 1fr 1fr 120px'
@@ -13,7 +12,7 @@ export function Subscribers() {
   const po = poStatusBadge(s.dark)
   const inactive = inactiveBadge(s.dark)
   const list = s.lists.subscribers
-  const rows = list.rows as Subscriber[]
+  const rows = list.rows
   const isMobile = useIsMobile()
 
   return (
