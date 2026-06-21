@@ -1,0 +1,45 @@
+name: Auto merge
+
+on:
+  pull_request_target:
+    branches:
+      - dev
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  enable:
+    name: Enable merge after required checks
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate route and enable auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.DEEDIMS_AUTOMATION_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          if [ "$HEAD_BRANCH" = "main" ] && [ "$BASE_BRANCH" = "dev" ]; then
+            gh pr merge "$PR_NUMBER" --repo "$REPOSITORY" --auto --merge
+            exit 0
+          fi
+
+          case "$HEAD_BRANCH" in
+            feat/*|fix/*|docs/*|test/*|refactor/*|chore/*|hotfix/*) ;;
+            *)
+              echo "Auto-merge rejected: unsupported source branch $HEAD_BRANCH."
+              exit 1
+              ;;
+          esac
+
+          gh pr merge "$PR_NUMBER" --repo "$REPOSITORY" --auto --merge
