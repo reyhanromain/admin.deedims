@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   validate:
-    name: Validate branch promotion
+    name: ${{ github.base_ref == 'dev' && 'Validate integration promotion' || 'Validate production promotion' }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out the change branch

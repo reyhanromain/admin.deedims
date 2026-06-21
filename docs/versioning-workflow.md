@@ -85,6 +85,9 @@ The repository workflow validates these rules automatically:
   `dev`.
 - The exact change-branch head must already exist in `dev` before it can enter
   `main`.
+- Integration and production use distinct required-check contexts, preventing
+  GitHub from reusing a successful `dev` status for a `main` PR with the same
+  change-branch SHA.
 - Backend and frontend quality checks must pass before either protected branch
   can be merged.
 - Branch protection applies to administrators too, so repository owners cannot
