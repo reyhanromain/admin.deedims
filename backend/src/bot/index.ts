@@ -103,7 +103,7 @@ export function createBot(token = config.botToken): Bot | null {
       const fulfillmentWeek = formatFulfillmentWeek(preOrder.fulfillmentStartDate, preOrder.fulfillmentEndDate)
       return reply(ctx, [intro, '', 'Pre-order sedang dibuka ya kak 🎉', '', preOrder.title, preOrder.description,
         fulfillmentWeek ? `Pekan pengambilan/pengiriman: ${fulfillmentWeek}` : null,
-        preOrder.fulfillmentNote ? `Catatan: ${preOrder.fulfillmentNote}` : null, '', 'Kalau kakak mau pesan, silakan kirim /order ya.'].filter(Boolean).join('\n'))
+        preOrder.fulfillmentNote ? `Catatan: ${preOrder.fulfillmentNote}` : null, '', 'Silakan kirim /order untuk memesan ya kak.'].filter(Boolean).join('\n'))
     })
   })
 
