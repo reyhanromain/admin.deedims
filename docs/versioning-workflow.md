@@ -14,6 +14,23 @@ environment.
 Never develop directly on `main` or `dev`. Do not merge `dev` into `main`,
 because that can release other changes that have not finished testing.
 
+This is a hard gate, including for automated coding agents. Before the first
+edit, inspect the active branch and working tree, create the change branch when
+needed, and run the repository preflight:
+
+```bash
+git branch --show-current
+git status --short
+scripts/git-preflight.sh
+```
+
+Install the tracked hooks once per clone. They reject commits made on a
+long-lived branch and direct pushes to either protected branch:
+
+```bash
+scripts/setup-git-hooks.sh
+```
+
 Branch prefixes:
 
 - `feat/` for user-facing features.
@@ -64,6 +81,10 @@ The repository workflow validates these rules automatically:
   `dev`.
 - The exact change-branch head must already exist in `dev` before it can enter
   `main`.
+- Backend and frontend quality checks must pass before either protected branch
+  can be merged.
+- Branch protection applies to administrators too, so repository owners cannot
+  accidentally bypass the PR gates.
 
 ## Commits
 

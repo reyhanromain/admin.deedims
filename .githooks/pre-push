@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+set -eu
+
+root=$(git rev-parse --show-toplevel)
+"$root/scripts/git-preflight.sh"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main|refs/heads/dev)
+      echo "Push rejected: $remote_ref is protected and must be updated through a pull request." >&2
+      exit 1
+      ;;
+  esac
+done
