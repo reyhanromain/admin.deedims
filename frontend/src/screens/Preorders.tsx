@@ -4,6 +4,7 @@ import { fmt } from '../format'
 import { cardStyle, inputStyle, labelStyle, tableHeadStyle } from '../styles'
 import { HoverButton, Hoverable, Pill } from '../ui'
 import { Pager } from '../components/Pager'
+import { WeekPicker } from '../components/WeekPicker'
 import type { OrderRow, PreorderRow } from '../types'
 import { useIsMobile } from '../responsive'
 
@@ -42,7 +43,8 @@ export function Preorders() {
             </div>
             <div>
               <label style={labelStyle(t)}>Pekan pengambilan / pengiriman</label>
-              <input type="week" value={s.poWeek} onChange={(e) => s.set({ poWeek: e.target.value })} style={inputStyle(t, { padding: '9px 12px' })} />
+              <WeekPicker t={t} value={s.poWeek} onChange={(value) => s.set({ poWeek: value })} />
+              <div style={{ fontSize: 11.5, color: t.faint, marginTop: 5 }}>Rentang Senin–Jumat. Sabtu & Minggu otomatis dikecualikan.</div>
             </div>
           </div>
           <div style={{ marginBottom: 12 }}>
