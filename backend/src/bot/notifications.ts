@@ -1,5 +1,5 @@
 import { prisma } from '../db'
-import { formatJakarta } from '../time'
+import { formatFulfillmentWeek } from '../time'
 
 type SentMessage = { message_id: number; date: number }
 type Sender = (chatId: bigint, text: string, options?: Record<string, unknown>) => Promise<SentMessage>
@@ -81,14 +81,15 @@ export async function notifyOrderStatus(orderId: number, event: 'status' | 'canc
   return sendTelegramMessage(order.telegramUserId, text, { orderId, intent: `order_${event}` })
 }
 
-function reminderText(preOrder: { title: string | null; description: string | null; fulfillmentDate: Date | null; fulfillmentNote: string | null }) {
+function reminderText(preOrder: { title: string | null; description: string | null; fulfillmentStartDate: Date | null; fulfillmentEndDate: Date | null; fulfillmentNote: string | null }) {
+  const fulfillmentWeek = formatFulfillmentWeek(preOrder.fulfillmentStartDate, preOrder.fulfillmentEndDate)
   return [
     'Halo kak 👋',
     'Pre-order Deedims sudah dibuka ya!',
     '',
     preOrder.title,
     preOrder.description,
-    preOrder.fulfillmentDate ? `Pengambilan/pengiriman: ${formatJakarta(preOrder.fulfillmentDate)}` : null,
+    fulfillmentWeek ? `Pekan pengambilan/pengiriman: ${fulfillmentWeek}` : null,
     preOrder.fulfillmentNote ? `Catatan: ${preOrder.fulfillmentNote}` : null,
     '',
     'Kalau kakak mau pesan, silakan kirim /order.',

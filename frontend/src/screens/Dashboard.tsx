@@ -107,7 +107,7 @@ export function Dashboard() {
               {openPo ? openPo.title : 'Belum ada batch open'}
             </div>
             <div style={{ fontSize: 13, opacity: 0.85, lineHeight: 1.5, marginBottom: 14 }}>
-              {openPo ? 'Fulfillment ' + openPo.date + ' · ' + openPo.note : 'Buka batch pre-order agar customer bisa mulai order.'}
+              {openPo ? 'Pekan fulfillment ' + openPo.fulfillmentWeek + ' · ' + openPo.note : 'Buka batch pre-order agar customer bisa mulai order.'}
             </div>
             <HoverButton
               onClick={() => s.set({ screen: 'preorders' })}

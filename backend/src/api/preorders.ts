@@ -5,13 +5,14 @@ import { HttpError, ok, pageMeta } from '../lib/http'
 import { parsePage } from '../lib/paginate'
 import { itemsSummary } from '../lib/itemsSummary'
 import { dispatchPreOrderReminders } from '../bot/notifications'
+import { parseFulfillmentWeek } from '../time'
 
 const idOf = (req: { params: unknown }) => Number((req.params as { id: string }).id)
 
 const createSchema = z.object({
   title: z.string().min(1),
   description: z.string().nullable().optional(),
-  fulfillmentDate: z.string().nullable().optional(),
+  fulfillmentWeek: z.string().min(1),
   fulfillmentNote: z.string().nullable().optional(),
 })
 
@@ -23,7 +24,7 @@ export async function preordersRoutes(app: FastifyInstance) {
     const { skip, take, page, limit } = parsePage(req)
     const [total, rows] = await Promise.all([
       prisma.preOrder.count(),
-      prisma.preOrder.findMany({ orderBy: [{ fulfillmentDate: 'desc' }, { id: 'desc' }], skip, take }),
+      prisma.preOrder.findMany({ orderBy: [{ fulfillmentStartDate: 'desc' }, { id: 'desc' }], skip, take }),
     ])
     const ids = rows.map((r) => r.id)
     const [countByPo, revByPo] = await Promise.all([
@@ -34,7 +35,7 @@ export async function preordersRoutes(app: FastifyInstance) {
     const rMap = new Map(revByPo.map((g) => [g.preOrderId, g._sum.totalAmount ?? 0]))
     const data = rows.map((p) => ({
       id: p.id, title: p.title, description: p.description, status: p.status,
-      fulfillmentDate: p.fulfillmentDate, fulfillmentNote: p.fulfillmentNote,
+      fulfillmentStartDate: p.fulfillmentStartDate, fulfillmentEndDate: p.fulfillmentEndDate, fulfillmentNote: p.fulfillmentNote,
       orderCount: cMap.get(p.id) ?? 0, revenue: rMap.get(p.id) ?? 0,
     }))
     return ok(data, pageMeta(total, page, limit))
@@ -63,16 +64,18 @@ export async function preordersRoutes(app: FastifyInstance) {
   // POST /api/preorders — draft baru
   app.post('/', async (req, reply) => {
     const parsed = createSchema.safeParse(req.body)
-    if (!parsed.success) throw new HttpError(400, 'Judul batch wajib diisi', 'VALIDATION')
+    if (!parsed.success) throw new HttpError(400, 'Judul batch dan pekan pengambilan/pengiriman wajib diisi', 'VALIDATION')
     const d = parsed.data
+    const fulfillment = parseFulfillmentWeek(d.fulfillmentWeek)
+    if (!fulfillment) throw new HttpError(400, 'Pekan pengambilan/pengiriman tidak valid', 'VALIDATION')
     const po = await prisma.preOrder.create({
       data: {
         title: d.title, description: d.description ?? null, status: 'draft',
-        fulfillmentDate: d.fulfillmentDate ? new Date(d.fulfillmentDate) : null, fulfillmentNote: d.fulfillmentNote ?? null,
+        fulfillmentStartDate: fulfillment.start, fulfillmentEndDate: fulfillment.end, fulfillmentNote: d.fulfillmentNote ?? null,
       },
     })
     reply.code(201)
-    return ok({ id: po.id, title: po.title, description: po.description, status: po.status, fulfillmentDate: po.fulfillmentDate, fulfillmentNote: po.fulfillmentNote, orderCount: 0, revenue: 0 })
+    return ok({ id: po.id, title: po.title, description: po.description, status: po.status, fulfillmentStartDate: po.fulfillmentStartDate, fulfillmentEndDate: po.fulfillmentEndDate, fulfillmentNote: po.fulfillmentNote, orderCount: 0, revenue: 0 })
   })
 
   // POST /api/preorders/:id/open — aturan: hanya satu PO boleh open

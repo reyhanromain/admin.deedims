@@ -104,7 +104,7 @@ interface State {
   showPoForm: boolean
   poTitle: string
   poDesc: string
-  poDate: string
+  poWeek: string
   poNote: string
   showStockForm: boolean
   editStockId: number | null
@@ -159,7 +159,7 @@ const initialState: State = {
   selectedPreorderId: null,
   preorderOrders: emptyList(),
   expandedMenuId: null,
-  showPoForm: false, poTitle: '', poDesc: '', poDate: '', poNote: '',
+  showPoForm: false, poTitle: '', poDesc: '', poWeek: '', poNote: '',
   showStockForm: false, editStockId: null, sName: '', sLabel: '', sQty: '', sUnit: '',
   editMenuId: null, menuDraft: null,
   showUserForm: false, uName: '', uFull: '', uPass: '',
@@ -653,14 +653,15 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       },
       createPo: () => {
         if (!state.poTitle.trim()) { showToast('Judul batch wajib diisi'); return }
+        if (!state.poWeek) { showToast('Pekan pengambilan/pengiriman wajib diisi'); return }
         void (async () => {
           try {
             const po = await api.createPreorder({
               title: state.poTitle, description: state.poDesc || null,
-              fulfillmentDate: state.poDate ? new Date(state.poDate + 'T00:00:00').toISOString() : null,
+              fulfillmentWeek: state.poWeek,
               fulfillmentNote: state.poNote || null,
             })
-            update((s) => ({ lists: { ...s.lists, preorders: { ...s.lists.preorders, rows: [mapPreorderRow(po), ...s.lists.preorders.rows] } }, showPoForm: false, poTitle: '', poDesc: '', poDate: '', poNote: '' }))
+            update((s) => ({ lists: { ...s.lists, preorders: { ...s.lists.preorders, rows: [mapPreorderRow(po), ...s.lists.preorders.rows] } }, showPoForm: false, poTitle: '', poDesc: '', poWeek: '', poNote: '' }))
             showToast('Draft batch dibuat — buka saat siap terima order')
           } catch (e) { fail(e) }
         })()

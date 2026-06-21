@@ -241,7 +241,7 @@ function OrderDetail() {
               <Row t={t} label="Pembayaran"><span style={{ fontWeight: 700 }}>COD</span></Row>
               <Row t={t} label="Status bayar"><span style={{ fontWeight: 700, color: pay[sel.pay].color }}>{pay[sel.pay].label}</span></Row>
               <Row t={t} label="Pre-order"><span style={{ fontWeight: 700 }}>{sel.poTitle}</span></Row>
-              <Row t={t} label="Jadwal"><span style={{ fontWeight: 700 }}>{sel.poDate}</span></Row>
+              <Row t={t} label="Pekan fulfillment"><span style={{ fontWeight: 700 }}>{sel.poFulfillmentWeek}</span></Row>
               <Row t={t} label="Diperbarui"><span style={{ fontWeight: 700 }}>{sel.updatedAt}</span></Row>
             </div>
           </div>

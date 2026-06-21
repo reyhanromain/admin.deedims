@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   fmtDateTime,
+  fmtFulfillmentWeek,
   mapBotMessage,
   mapBotMessageCustomer,
   mapCustomerRow,
@@ -26,6 +27,13 @@ describe('fmtDateTime', () => {
   })
 })
 
+describe('fmtFulfillmentWeek', () => {
+  it('memformat pekan kerja dalam bahasa Indonesia', () => {
+    expect(fmtFulfillmentWeek('2026-06-21T17:00:00Z', '2026-06-25T17:00:00Z')).toBe('22–26 Juni 2026')
+    expect(fmtFulfillmentWeek('2026-06-28T17:00:00Z', '2026-07-02T17:00:00Z')).toBe('29 Juni–3 Juli 2026')
+  })
+})
+
 describe('mapStock / mapMenu', () => {
   it('stock default unit pcs', () => {
     expect(mapStock({ id: 1, label: 's1', name: 'S', quantity: 5, unit: null })).toEqual({ id: 1, label: 's1', name: 'S', quantity: 5, unit: 'pcs' })
@@ -42,7 +50,7 @@ describe('mapOrderRow / mapOrderDetail', () => {
     const r = mapOrderRow({ id: 1, code: 'DD-1', customer: 'Sari', username: 'sari', createdAt: '2026-06-12T02:13:00Z', itemsSummary: 'Menu A x1', total: 64000, status: 'confirmed', pay: 'pending', cancelRequested: true })
     expect(r).toMatchObject({ code: 'DD-1', createdAt: '12 Jun, 09:13', itemsSummary: 'Menu A x1', total: 64000, status: 'confirmed', cancelRequested: true })
   })
-  it('detail: item snapshot → {name,meta,addon}, preOrder → poTitle/poDate', () => {
+  it('detail: item snapshot → {name,meta,addon}, preOrder → pekan fulfillment', () => {
     const d = mapOrderDetail({
       id: 1, code: 'DD-1', customer: 'Sari', username: 'sari', createdAt: '2026-06-12T02:13:00Z', updatedAt: '2026-06-12T03:00:00Z',
       status: 'confirmed', pay: 'pending', adminNotes: null, cancelRequested: false, total: 64000,
@@ -50,18 +58,18 @@ describe('mapOrderRow / mapOrderDetail', () => {
         { menuNameSnapshot: 'Menu A', variantNameSnapshot: 'Mentai', unitPrice: 32000, quantity: 2 },
         { menuNameSnapshot: 'Saus', variantNameSnapshot: 'Add-on', unitPrice: 5000, quantity: 1 },
       ],
-      preOrder: { title: 'PO Open', fulfillmentDate: '2026-06-14T05:00:00Z' },
+      preOrder: { title: 'PO Open', fulfillmentStartDate: '2026-06-21T17:00:00Z', fulfillmentEndDate: '2026-06-25T17:00:00Z' },
     })
     expect(d.items[0]).toEqual({ name: 'Menu A', meta: 'Varian: Mentai', qty: 2, price: 32000, addon: false })
     expect(d.items[1]).toEqual({ name: 'Saus', meta: '', qty: 1, price: 5000, addon: true })
-    expect(d).toMatchObject({ poTitle: 'PO Open', poDate: '14 Jun 2026', adminNotes: '' })
+    expect(d).toMatchObject({ poTitle: 'PO Open', poFulfillmentWeek: '22–26 Juni 2026', adminNotes: '' })
   })
 })
 
 describe('mapPreorderRow / mapCustomerRow / mapSubscriber / mapSetting / mapUser', () => {
-  it('preorder row: date + stats', () => {
-    expect(mapPreorderRow({ id: 2, title: 'PO', description: null, status: 'open', fulfillmentDate: '2026-06-14T05:00:00Z', fulfillmentNote: null, orderCount: 3, revenue: 90000 }))
-      .toMatchObject({ status: 'open', date: '14 Jun 2026', note: '—', orderCount: 3, revenue: 90000 })
+  it('preorder row: fulfillment week + stats', () => {
+    expect(mapPreorderRow({ id: 2, title: 'PO', description: null, status: 'open', fulfillmentStartDate: '2026-06-21T17:00:00Z', fulfillmentEndDate: '2026-06-25T17:00:00Z', fulfillmentNote: null, orderCount: 3, revenue: 90000 }))
+      .toMatchObject({ status: 'open', fulfillmentWeek: '22–26 Juni 2026', note: '—', orderCount: 3, revenue: 90000 })
   })
   it('customer row: stats + joined + lastOrder', () => {
     expect(mapCustomerRow({ id: 1, username: 'sari', name: 'Sari', blocked: true, joinedAt: '2026-05-02T03:00:00Z', orderCount: 2, totalSpent: 50000, lastOrderAt: '2026-06-12T02:13:00Z', reminderActive: true }))
@@ -90,12 +98,12 @@ describe('mapDashboard', () => {
   it('kpis + openPreorder date + recent + lowStock', () => {
     const d = mapDashboard({
       kpis: { newOrders: 0, batchOrders: 1, batchRevenue: 10000, cancelRequests: 1 },
-      openPreorder: { id: 1, title: 'PO Open', fulfillmentDate: '2026-06-14T05:00:00Z', fulfillmentNote: 'n' },
+      openPreorder: { id: 1, title: 'PO Open', fulfillmentStartDate: '2026-06-21T17:00:00Z', fulfillmentEndDate: '2026-06-25T17:00:00Z', fulfillmentNote: 'n' },
       recentOrders: [{ id: 1, code: 'DD-1', customer: 'Sari', itemsSummary: 'Menu A x1', total: 10000, status: 'submitted' }],
       lowStock: [{ id: 2, name: 'Stock 2', quantity: 5, unit: 'pcs' }],
     })
     expect(d.kpis.batchRevenue).toBe(10000)
-    expect(d.openPreorder).toMatchObject({ title: 'PO Open', date: '14 Jun 2026', note: 'n' })
+    expect(d.openPreorder).toMatchObject({ title: 'PO Open', fulfillmentWeek: '22–26 Juni 2026', note: 'n' })
     expect(d.recentOrders[0]).toMatchObject({ code: 'DD-1', itemsSummary: 'Menu A x1' })
     expect(d.lowStock[0]).toMatchObject({ name: 'Stock 2', quantity: 5 })
   })

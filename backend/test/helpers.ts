@@ -64,7 +64,7 @@ export async function seedFixtures() {
   await prisma.customer.create({ data: { id: 1, telegramUserId: 111n, username: 'sari', name: 'Sari' } })
 
   // PO 1 open, PO 2 draft (untuk uji aturan single-open).
-  await prisma.preOrder.create({ data: { id: 1, title: 'PO Open', status: 'open', openedAt: new Date() } })
+  await prisma.preOrder.create({ data: { id: 1, title: 'PO Open', status: 'open', openedAt: new Date(), fulfillmentStartDate: new Date('2026-06-21T17:00:00Z'), fulfillmentEndDate: new Date('2026-06-25T17:00:00Z') } })
   await prisma.preOrder.create({ data: { id: 2, title: 'PO Draft', status: 'draft' } })
 
   // Order 1 dengan permintaan pembatalan pending.

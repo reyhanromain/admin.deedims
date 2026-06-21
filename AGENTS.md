@@ -33,6 +33,10 @@ Use Vitest for both packages. Name tests `*.test.ts` or `*.test.tsx`. Backend in
 
 Use Conventional Commits such as `feat(preorders): add cancellation tests` or `fix(menu): validate uploads`. Create every change branch from `main`, merge the completed branch into `dev` for integration testing, then merge that same tested branch directly into `main`. Keep the branch until both merges are complete; do not merge `dev` into `main`. Pull requests should describe the change, list verification commands, link issues, and include screenshots for CMS UI changes. Call out schema, seed, environment, or Docker changes. See `docs/versioning-workflow.md` for the full branch contract.
 
+### Mandatory Git Preflight
+
+Before the first file edit in every coding task, run `git branch --show-current` and `git status --short`. Never edit on `main` or `dev`; if either is active, create a correctly prefixed change branch from `main` first. Run `scripts/git-preflight.sh` before editing and again before committing. Treat a failed preflight as a hard stop for code changes. Install the repository hooks once per clone with `scripts/setup-git-hooks.sh`.
+
 ## Security & Configuration Tips
 
 Copy `backend/.env.example` to `backend/.env` for local development. Set real `BOT_TOKEN` and `JWT_SECRET` outside source control. Never commit generated uploads, local SQLite DBs, or secrets.

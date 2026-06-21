@@ -41,8 +41,8 @@ export function Preorders() {
               <input value={s.poTitle} onChange={(e) => s.set({ poTitle: e.target.value })} placeholder="PO Juli Minggu 1" style={inputStyle(t)} />
             </div>
             <div>
-              <label style={labelStyle(t)}>Tanggal pengambilan / pengiriman</label>
-              <input type="date" value={s.poDate} onChange={(e) => s.set({ poDate: e.target.value })} style={inputStyle(t, { padding: '9px 12px' })} />
+              <label style={labelStyle(t)}>Pekan pengambilan / pengiriman</label>
+              <input type="week" value={s.poWeek} onChange={(e) => s.set({ poWeek: e.target.value })} style={inputStyle(t, { padding: '9px 12px' })} />
             </div>
           </div>
           <div style={{ marginBottom: 12 }}>
@@ -79,7 +79,7 @@ export function Preorders() {
                 <span style={{ fontSize: 11.5, color: t.faint }}>Lihat order ›</span>
               </div>
               <div style={{ fontSize: 13, color: t.muted, lineHeight: 1.5 }}>{p.description}</div>
-              <div style={{ fontSize: 12, color: t.faint, marginTop: 5 }}>{p.date} · {p.note}</div>
+              <div style={{ fontSize: 12, color: t.faint, marginTop: 5 }}>{p.fulfillmentWeek} · {p.note}</div>
             </Hoverable>
             <div style={{ display: 'flex', gap: 10, width: isMobile ? '100%' : 'auto' }}>
             <div style={{ textAlign: isMobile ? 'left' : 'right', minWidth: 90, flex: isMobile ? 1 : '0 0 auto', background: isMobile ? t.surfaceAlt : undefined, border: isMobile ? `1px solid ${t.rowBorder}` : undefined, borderRadius: isMobile ? 8 : undefined, padding: isMobile ? '10px 12px' : undefined }}>
@@ -153,7 +153,7 @@ function PreorderDetail() {
               <span style={{ fontSize: 16, fontWeight: 700 }}>{p.title}</span>
               <span style={{ background: po[p.status].bg, color: po[p.status].color, fontSize: 11, fontWeight: 700, borderRadius: 99, padding: '3px 10px', textTransform: 'capitalize' }}>{p.status}</span>
             </div>
-            <div style={{ fontSize: 12.5, color: t.faint }}>{p.date} · {p.note}</div>
+            <div style={{ fontSize: 12.5, color: t.faint }}>{p.fulfillmentWeek} · {p.note}</div>
           </div>
           <div style={{ display: 'flex', gap: 10, width: isMobile ? '100%' : 'auto' }}>
           <div style={{ textAlign: isMobile ? 'left' : 'right', minWidth: 90, flex: isMobile ? 1 : '0 0 auto', background: isMobile ? t.surfaceAlt : undefined, border: isMobile ? `1px solid ${t.rowBorder}` : undefined, borderRadius: isMobile ? 8 : undefined, padding: isMobile ? '10px 12px' : undefined }}>
