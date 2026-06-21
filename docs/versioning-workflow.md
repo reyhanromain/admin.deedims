@@ -190,14 +190,22 @@ npm --prefix backend version X.Y.Z --no-git-tag-version
 npm --prefix frontend version X.Y.Z --no-git-tag-version
 ```
 
-After the release branch is merged into `main`, tag that merge commit:
+After the release branch is merged into `main`, tag that merge commit and create
+the GitHub Release. A full release is not complete until both the annotated tag
+and the GitHub Release page exist for the same version.
 
 ```bash
 git switch main
 git pull --ff-only origin main
 git tag -a vX.Y.Z -m "vX.Y.Z"
 git push origin main vX.Y.Z
+gh release create vX.Y.Z --title "vX.Y.Z" --notes-file /tmp/deedims-release-notes-X.Y.Z.md
+gh release view vX.Y.Z
 ```
+
+Use the matching `CHANGELOG.md` entry as the GitHub Release notes. If the local
+pre-push hook blocks a tag-only push while on `main`, switch back to the release
+branch after fast-forwarding it to `origin/main`, then push only the tag.
 
 ## Hotfix Flow
 
