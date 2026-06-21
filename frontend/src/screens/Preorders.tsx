@@ -5,7 +5,6 @@ import { cardStyle, inputStyle, labelStyle, tableHeadStyle } from '../styles'
 import { HoverButton, Hoverable, Pill } from '../ui'
 import { Pager } from '../components/Pager'
 import { WeekPicker } from '../components/WeekPicker'
-import type { OrderRow, PreorderRow } from '../types'
 import { useIsMobile } from '../responsive'
 
 export function Preorders() {
@@ -14,7 +13,7 @@ export function Preorders() {
   const isMobile = useIsMobile()
   const po = poStatusBadge(s.dark)
   const list = s.lists.preorders
-  const rows = list.rows as PreorderRow[]
+  const rows = list.rows
 
   if (s.selectedPreorderId != null) return <PreorderDetail />
 
@@ -135,9 +134,9 @@ function PreorderDetail() {
   const isMobile = useIsMobile()
   const status = orderStatusBadge(s.dark)
   const po = poStatusBadge(s.dark)
-  const p = (s.lists.preorders.rows as PreorderRow[]).find((x) => x.id === s.selectedPreorderId) || null
+  const p = s.lists.preorders.rows.find((x) => x.id === s.selectedPreorderId) || null
   const list = s.preorderOrders
-  const rows = list.rows as OrderRow[]
+  const rows = list.rows
 
   return (
     <section>

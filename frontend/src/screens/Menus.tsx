@@ -4,7 +4,7 @@ import { fmt } from '../format'
 import { cardStyle } from '../styles'
 import { HoverButton, Icon } from '../ui'
 import { Pager } from '../components/Pager'
-import type { Menu, StockItem, Variant } from '../types'
+import type { Menu, Variant } from '../types'
 import { useIsMobile } from '../responsive'
 
 export function Menus() {
@@ -13,7 +13,7 @@ export function Menus() {
   const list = s.lists.menus
 
   const usageOf = (v: Variant): string => {
-    const st = (s.lists.stock.rows as StockItem[]).find((x) => x.id === v.stockId)
+    const st = s.lists.stock.rows.find((x) => x.id === v.stockId)
     if (!st || !v.qty) return 'Belum di-mapping ke stock'
     return v.qty + ' ' + st.unit + ' · ' + st.name
   }
@@ -34,7 +34,7 @@ export function Menus() {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {(list.rows as Menu[]).map((m) => (
+        {list.rows.map((m) => (
           <MenuCard key={m.id} menu={m} usageOf={usageOf} />
         ))}
       </div>
@@ -49,7 +49,7 @@ function MenuCard({ menu: m, usageOf }: { menu: Menu; usageOf: (v: Variant) => s
   const t = getTheme(s.dark)
   const isMobile = useIsMobile()
   const expanded = s.expandedMenuId === m.id
-  const linkedMenus = s.lists.menus.rows as Menu[]
+  const linkedMenus = s.lists.menus.rows
   const paidAddonNames = m.addons.filter((a) => !m.freeAddons.includes(a)).map((a) => linkedMenus.find((x) => x.id === a)?.name || '—')
   const freeAddonNames = m.freeAddons.map((a) => linkedMenus.find((x) => x.id === a)?.name || '—')
 

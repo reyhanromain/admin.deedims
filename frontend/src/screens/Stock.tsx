@@ -3,7 +3,6 @@ import { getTheme, BRAND, LOW_STOCK_THRESHOLD } from '../theme'
 import { cardStyle, inputStyle, labelStyle, tableHeadStyle } from '../styles'
 import { HoverButton } from '../ui'
 import { Pager } from '../components/Pager'
-import type { StockItem } from '../types'
 import { useIsMobile } from '../responsive'
 
 const GRID = '1.5fr 1fr 1fr 230px'
@@ -69,7 +68,7 @@ export function Stock() {
 
       {isMobile ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {(list.rows as StockItem[]).map((item) => {
+          {list.rows.map((item) => {
             const isLow = item.quantity <= LOW_STOCK_THRESHOLD
             return (
               <div key={item.id} style={cardStyle(t, { padding: 14 })}>
@@ -102,7 +101,7 @@ export function Stock() {
           <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 12, ...tableHeadStyle(t, 700) }}>
             <div>Stock item</div><div>Label</div><div>Sisa</div><div style={{ textAlign: 'right' }}>Adjust</div>
           </div>
-          {(list.rows as StockItem[]).map((item) => {
+          {list.rows.map((item) => {
             const isLow = item.quantity <= LOW_STOCK_THRESHOLD
             return (
               <div key={item.id} style={{ display: 'grid', gridTemplateColumns: GRID, gap: 12, padding: '13px 20px', borderBottom: `1px solid ${t.rowBorder}`, alignItems: 'center', minWidth: 700 }}>

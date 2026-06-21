@@ -4,7 +4,7 @@ import { fmt } from '../format'
 import { cardStyle, inputStyle, mobileMetaGrid, mobileStatStyle, tableHeadStyle } from '../styles'
 import { HoverButton, Hoverable, Icon, Pill } from '../ui'
 import { Pager } from '../components/Pager'
-import type { OrderRow, OrderStatus } from '../types'
+import type { OrderStatus } from '../types'
 import { useIsMobile } from '../responsive'
 
 const GRID = '230px minmax(220px, 1.2fr) minmax(300px, 1.5fr) 110px 150px 130px'
@@ -21,7 +21,7 @@ export function Orders() {
 
   const filters: ('all' | OrderStatus)[] = ['all', 'submitted', 'confirmed', 'ready', 'completed', 'cancelled']
   const list = s.lists.orders
-  const rows = list.rows as OrderRow[]
+  const rows = list.rows
 
   return (
     <section>
@@ -173,14 +173,14 @@ function OrderDetail() {
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <HoverButton
-              onClick={() => { s.patchOrder(sel.id, { status: 'cancelled', pay: 'cancelled', cancelRequested: false }); s.showToast('Pembatalan disetujui — stock dikembalikan') }}
+              onClick={() => { s.approveCancellation(sel.id); s.showToast('Pembatalan disetujui — stock dikembalikan') }}
               style={{ border: 'none', background: BRAND.terracotta, color: '#fff', fontSize: 12.5, fontWeight: 700, borderRadius: 10, padding: '9px 14px' }}
               hover={{ background: BRAND.terracottaDark }}
             >
               Setujui pembatalan
             </HoverButton>
             <HoverButton
-              onClick={() => { s.patchOrder(sel.id, { cancelRequested: false }); s.showToast('Request cancel ditolak, order tetap jalan') }}
+              onClick={() => { s.rejectCancellation(sel.id); s.showToast('Request cancel ditolak, order tetap jalan') }}
               style={{ border: `1px solid ${t.inputBorder}`, background: t.surface, color: t.ink, fontSize: 12.5, fontWeight: 700, borderRadius: 10, padding: '9px 14px' }}
               hover={{ opacity: 0.75 }}
             >
