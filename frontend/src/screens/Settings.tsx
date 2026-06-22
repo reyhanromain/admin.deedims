@@ -29,6 +29,8 @@ export function Settings() {
   const t = getTheme(s.dark)
   const list = s.lists.settings
   const [tab, setTab] = useState<TabId>('bot')
+  const stickyTop = 0
+  const sectionStickyTop = 54
 
   const rows = list.rows.filter((setting) => {
     if (tab === 'bot') return setting.category.startsWith('bot_messages') || setting.inputType === 'html'
@@ -45,25 +47,43 @@ export function Settings() {
   return (
     <section style={{ maxWidth: 920, width: '100%' }}>
       <p style={{ margin: '0 0 16px 0', fontSize: 13.5, color: t.muted }}>Konfigurasi bot yang bisa diubah tanpa deploy ulang. Template HTML memakai format Telegram dan placeholder yang tersedia di tiap kartu.</p>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+      <div style={{ position: 'sticky', top: stickyTop, zIndex: 20, background: t.bg, padding: '0 0 12px', marginBottom: 16, borderBottom: `1px solid ${t.border}` }}>
+        <div style={{ display: 'flex', gap: 0, overflowX: 'auto', borderBottom: `1px solid ${t.border}` }}>
         {tabs.map((item) => {
           const active = tab === item.id
           return (
-            <button key={item.id} type="button" onClick={() => setTab(item.id)} style={{ border: `1px solid ${active ? BRAND.terracotta : t.border}`, background: active ? BRAND.terracotta : t.surface, color: active ? '#fff' : t.ink, borderRadius: 999, padding: '9px 14px', fontSize: 13, fontWeight: 800 }}>
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setTab(item.id)}
+              style={{
+                border: 'none',
+                borderBottom: `3px solid ${active ? BRAND.terracotta : 'transparent'}`,
+                background: active ? t.surface : 'transparent',
+                color: active ? BRAND.terracotta : t.muted,
+                padding: '12px 18px 10px',
+                fontSize: 13,
+                fontWeight: 800,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                marginBottom: -1,
+              }}
+            >
               {item.label}
             </button>
           )
         })}
+        </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         {Object.entries(grouped).map(([category, settings]) => (
           <div key={category} style={{ display: 'grid', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ position: 'sticky', top: sectionStickyTop, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, padding: '10px 12px', boxShadow: t.shadow }}>
               <h3 style={{ margin: 0, fontSize: 15, color: t.ink }}>{categoryLabels[category] ?? category}</h3>
               <HoverButton
                 onClick={() => s.saveSettings(settings.map((setting) => setting.id).filter((id): id is number => id != null))}
-                style={{ border: 'none', background: settings.some((setting) => setting.value !== setting.savedValue) ? BRAND.terracotta : t.solidBg, color: '#fff', fontSize: 12.5, fontWeight: 800, borderRadius: 10, padding: '8px 13px', opacity: settings.some((setting) => setting.value !== setting.savedValue) ? 1 : 0.7 }}
-                hover={{ background: settings.some((setting) => setting.value !== setting.savedValue) ? BRAND.terracottaDark : t.solidBg }}
+                style={{ border: 'none', background: BRAND.terracotta, color: '#fff', fontSize: 12.5, fontWeight: 800, borderRadius: 10, padding: '8px 13px', opacity: settings.some((setting) => setting.value !== setting.savedValue) ? 1 : 0.62, cursor: settings.some((setting) => setting.value !== setting.savedValue) ? 'pointer' : 'default' }}
+                hover={{ background: settings.some((setting) => setting.value !== setting.savedValue) ? BRAND.terracottaDark : BRAND.terracotta }}
               >
                 Save {categoryLabels[category] ?? category}
               </HoverButton>
