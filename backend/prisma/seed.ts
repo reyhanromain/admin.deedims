@@ -26,6 +26,7 @@ type StarterMenu = {
   isActive: boolean
   imageUrl: string | null
   isAddon: boolean
+  category?: string | null
   variants: Array<{
     name: string
     price: number
@@ -44,6 +45,7 @@ const starterMenus: StarterMenu[] = [
     isActive: false,
     imageUrl: '/uploads/ebdb321d-de8c-4e46-9b91-b80677003cd6.png',
     isAddon: false,
+    category: 'ready',
     variants: [
       { name: 'Ngemil (4 pcs)', price: 25000, stock: [{ label: 'dimsum', quantity: 4 }] },
       { name: 'Kenyang (6 pcs)', price: 35000, stock: [{ label: 'dimsum', quantity: 6 }] },
@@ -61,6 +63,7 @@ const starterMenus: StarterMenu[] = [
     isActive: false,
     imageUrl: '/uploads/4653c28f-ca25-4d1c-b2e0-9b50d796ef10.png',
     isAddon: false,
+    category: 'ready',
     variants: [
       { name: 'Kenyang (6 pcs)', price: 30000, stock: [{ label: 'dimsum', quantity: 6 }] },
       { name: 'Mini Party (12 pcs)', price: 55000, stock: [{ label: 'dimsum', quantity: 12 }] },
@@ -77,6 +80,7 @@ const starterMenus: StarterMenu[] = [
     isActive: false,
     imageUrl: null,
     isAddon: false,
+    category: 'frozen',
     variants: [
       { name: '(default)', price: 85000, stock: [{ label: 'dimsum', quantity: 16 }] },
     ],
@@ -188,6 +192,7 @@ async function seedCatalog() {
         isActive: menu.isActive,
         imageUrl: menu.imageUrl,
         isAddon: menu.isAddon,
+        category: menu.category ?? null,
         variants: {
           create: menu.variants.map((variant) => ({
             name: variant.name,

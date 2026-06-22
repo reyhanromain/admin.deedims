@@ -12,6 +12,7 @@ export const config = {
   databaseUrl: process.env.DATABASE_URL ?? 'file:./dev.db',
   jwtSecret: process.env.JWT_SECRET ?? 'dev-secret-change-me',
   botToken: process.env.BOT_TOKEN ?? '',
+  miniAppUrl: process.env.MINI_APP_URL ?? '',
   port: Number(process.env.PORT ?? 3000),
   tz: process.env.TZ ?? 'Asia/Jakarta',
   retentionDays: Number(process.env.RETENTION_DAYS ?? 14),

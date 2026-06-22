@@ -20,18 +20,35 @@ import { menusRoutes } from './api/menus'
 import { preordersRoutes } from './api/preorders'
 import { subscribersRoutes } from './api/subscribers'
 import { uploadsRoutes } from './api/uploads'
+import { miniappRoutes } from './api/miniapp'
 import { upsertBotMessageTemplates } from './bot/templates'
 
-/** Payload JWT yang kita tandatangani saat login. */
+/** Payload JWT admin yang kita tandatangani saat login CMS. */
 export interface JwtPayload {
   id: number
   username: string
   isSuper: boolean
 }
 
+/** Payload JWT customer mini app (hasil validasi Telegram initData). */
+export interface CustomerJwtPayload {
+  kind: 'customer'
+  telegramUserId: string
+  username?: string
+  name?: string
+}
+
+/** Identitas customer yang dipasang ke request setelah authenticateCustomer. */
+export interface CustomerContext {
+  id: bigint
+  username?: string
+  name?: string
+}
+
 declare module '@fastify/jwt' {
   interface FastifyJWT {
-    payload: JwtPayload
+    // `payload` (untuk sign) bisa admin atau customer; `user` (req.user) tetap admin.
+    payload: JwtPayload | CustomerJwtPayload
     user: JwtPayload
   }
 }
@@ -39,6 +56,10 @@ declare module '@fastify/jwt' {
 declare module 'fastify' {
   interface FastifyInstance {
     authenticate: (req: FastifyRequest, reply: FastifyReply) => Promise<void>
+    authenticateCustomer: (req: FastifyRequest, reply: FastifyReply) => Promise<void>
+  }
+  interface FastifyRequest {
+    customer?: CustomerContext
   }
 }
 
@@ -74,13 +95,32 @@ export async function buildServer() {
     reply.code(404).send({ data: null, meta: null, error: { message: 'Not found', code: 'NOT_FOUND' } })
   })
 
-  // Guard rute terproteksi: verifikasi JWT dari header Authorization: Bearer <token>.
+  // Guard rute admin: verifikasi JWT dari header Authorization: Bearer <token>.
+  // Token customer mini app ditolak agar tidak bisa menyentuh endpoint CMS.
   app.decorate('authenticate', async (req: FastifyRequest) => {
     try {
       await req.jwtVerify()
     } catch {
       throw new HttpError(401, 'Unauthorized', 'UNAUTHORIZED')
     }
+    if ((req.user as unknown as { kind?: string }).kind === 'customer') {
+      throw new HttpError(401, 'Unauthorized', 'UNAUTHORIZED')
+    }
+  })
+
+  // Guard rute customer mini app: verifikasi JWT lalu pasang req.customer.
+  app.decorateRequest('customer', undefined)
+  app.decorate('authenticateCustomer', async (req: FastifyRequest) => {
+    let payload: CustomerJwtPayload
+    try {
+      payload = await req.jwtVerify<CustomerJwtPayload>()
+    } catch {
+      throw new HttpError(401, 'Unauthorized', 'UNAUTHORIZED')
+    }
+    if (payload.kind !== 'customer' || !payload.telegramUserId) {
+      throw new HttpError(401, 'Unauthorized', 'UNAUTHORIZED')
+    }
+    req.customer = { id: BigInt(payload.telegramUserId), username: payload.username, name: payload.name }
   })
 
   app.get('/health', async () => ({ ok: true }))
@@ -97,6 +137,7 @@ export async function buildServer() {
   await app.register(preordersRoutes, { prefix: '/api/preorders' })
   await app.register(subscribersRoutes, { prefix: '/api/subscribers' })
   await app.register(uploadsRoutes, { prefix: '/api/uploads' })
+  await app.register(miniappRoutes, { prefix: '/api/miniapp' })
 
   return app
 }

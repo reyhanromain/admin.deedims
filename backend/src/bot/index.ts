@@ -112,7 +112,7 @@ export function createBot(token = config.botToken): Bot | null {
         preorder_description: preOrder.description ?? '',
         fulfillment_week: fulfillmentWeek ?? '',
         fulfillment_note: preOrder.fulfillmentNote ?? '',
-      })
+      }, miniAppKeyboard())
     })
   })
 
@@ -210,6 +210,7 @@ async function showMenuList(ctx: Context, user: TelegramCustomer, requestedPage:
   const pages = Math.max(1, Math.ceil(menus.length / size))
   const page = Math.min(requestedPage, pages)
   const keyboard = new InlineKeyboard()
+  if (config.miniAppUrl) keyboard.webApp('🛒 Pesan via Mini App', config.miniAppUrl).row()
   for (const menu of menus.slice((page - 1) * size, page * size)) keyboard.text(`${menu.name}${menu.isAddon ? ' (Addon)' : ''}`, `o:m:${menu.id}:${page}`).row()
   if (pages > 1) {
     if (page > 1) keyboard.text('Prev', `o:p:${page - 1}`)
@@ -430,6 +431,11 @@ async function cancelActiveOrderMessage(ctx: Context) {
 
 async function clearActiveOrderMessage(telegramUserId: bigint) {
   await prisma.customer.updateMany({ where: { telegramUserId }, data: { activeOrderMessageId: null } })
+}
+
+/** Keyboard inline berisi tombol web_app mini app (atau undefined kalau URL belum di-set). */
+function miniAppKeyboard(): InlineKeyboard | undefined {
+  return config.miniAppUrl ? new InlineKeyboard().webApp('🛒 Buka Mini App', config.miniAppUrl) : undefined
 }
 
 async function guarded(ctx: Context, action: (user: TelegramCustomer) => Promise<unknown>) {

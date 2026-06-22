@@ -92,6 +92,14 @@ export function MenuEditorModal() {
                 <label style={labelStyle(t)}>Label satuan (opsional)</label>
                 <input value={d.unitLabel} onChange={(e) => s.updateDraft({ unitLabel: e.target.value })} placeholder="pack" style={inputStyle(t)} />
               </div>
+              <div>
+                <label style={labelStyle(t)}>Kategori (mini app)</label>
+                <select value={d.category} onChange={(e) => s.updateDraft({ category: e.target.value })} style={inputStyle(t)}>
+                  <option value="">—</option>
+                  <option value="ready">Siap Makan</option>
+                  <option value="frozen">Frozen</option>
+                </select>
+              </div>
             </div>
           </div>
 
