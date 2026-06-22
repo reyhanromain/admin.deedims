@@ -218,6 +218,7 @@ model Menu {
   name           String
   description    String?
   basePrice      Int      @default(0) @map("base_price")
+  category       String?                                 // [CMS] kategori utk filter mini app (mis. ready|frozen)
   isActive       Boolean  @default(true) @map("is_active")
   imageUrl       String?  @map("image_url")              // [CMS] sumber kebenaran: path file lokal
   telegramFileId String?  @map("telegram_file_id")       // [CMS] cache file_id utk re-send cepat via bot

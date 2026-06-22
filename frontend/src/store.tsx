@@ -741,7 +741,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
           set({ editMenuId: menu.id, menuDraft: { ...JSON.parse(JSON.stringify(menu)), freeAddons: menu.freeAddons ?? [] } })
         } else {
           const firstStock = state.lists.stock.rows[0]?.id ?? 1
-          set({ editMenuId: 'new', menuDraft: { name: '', description: '', basePrice: 0, unitLabel: '', active: true, isAddon: false, image: '', variants: [{ name: '(default)', price: 0, stockId: firstStock, qty: 1, image: '' }], addons: [], freeAddons: [] } })
+          set({ editMenuId: 'new', menuDraft: { name: '', description: '', basePrice: 0, unitLabel: '', category: '', active: true, isAddon: false, image: '', variants: [{ name: '(default)', price: 0, stockId: firstStock, qty: 1, image: '' }], addons: [], freeAddons: [] } })
         }
       },
       closeMenuEditor: () => set({ editMenuId: null, menuDraft: null }),
