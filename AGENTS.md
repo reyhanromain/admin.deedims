@@ -33,6 +33,10 @@ Use Vitest for both packages. Name tests `*.test.ts` or `*.test.tsx`. Backend in
 
 Use Conventional Commits such as `feat(preorders): add cancellation tests` or `fix(menu): validate uploads`. Create every change branch from `main`, merge the completed branch into `dev` for integration testing, then merge that same tested branch directly into `main`. Keep the branch until both merges are complete; do not merge `dev` into `main`. Pull requests should describe the change, list verification commands, link issues, and include screenshots for CMS UI changes. Call out schema, seed, environment, or Docker changes. See `docs/versioning-workflow.md` for the full branch contract.
 
+### Delivery After Implementation
+
+When the user asks to implement a plan or complete a coding task, treat completion as implementation plus delivery to UAT unless the user explicitly says not to. After local verification passes, continue automatically by committing with a Conventional Commit message, pushing the change branch, opening a PR to `dev`, waiting for required checks, merging or enabling auto-merge according to repository policy, and verifying the staging rebuild/health checks. Do not stop at local tests when the branch is ready for UAT. Ask only before destructive actions, production promotion, or if checks fail and recovery requires a material decision.
+
 ### Mandatory Git Preflight
 
 Before the first file edit in every coding task, run `git branch --show-current` and `git status --short`. Never edit on `main` or `dev`; if either is active, create a correctly prefixed change branch from `main` first. Run `scripts/git-preflight.sh` before editing and again before committing. Treat a failed preflight as a hard stop for code changes. Install the repository hooks once per clone with `scripts/setup-git-hooks.sh`.

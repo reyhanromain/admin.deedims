@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import bcrypt from 'bcryptjs'
 import { buildServer } from '../src/server'
 import { prisma } from '../src/db'
+import { upsertBotMessageTemplates } from '../src/bot/templates'
 
 export { prisma }
 
@@ -31,6 +32,7 @@ export async function resetDb() {
   await prisma.customer.deleteMany()
   await prisma.user.deleteMany()
   await seedFixtures()
+  await upsertBotMessageTemplates()
 }
 
 /** Dataset kecil yang dipakai semua test. Password semua = "secret". */

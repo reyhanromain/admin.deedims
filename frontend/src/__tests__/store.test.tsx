@@ -58,7 +58,7 @@ beforeEach(() => {
   api.stockList.mockResolvedValue(paged([stockRow]))
   api.updateStock.mockResolvedValue({ id: 1, label: 'satu', name: 'Stock Satu', quantity: 12, unit: 'pack' })
   api.usersList.mockResolvedValue(paged(users))
-  api.settingsList.mockResolvedValue(paged([{ id: 7, label: 'k', desc: 'd', value: 'v', textarea: false }]))
+  api.settingsList.mockResolvedValue(paged([{ id: 7, label: 'k', desc: 'd', value: 'v', textarea: false, inputType: 'text', category: 'general', placeholders: [] }]))
 })
 
 const render = () => renderHook(() => useAdmin(), { wrapper: AdminProvider }).result

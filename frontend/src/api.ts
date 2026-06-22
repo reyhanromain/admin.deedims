@@ -208,7 +208,16 @@ export const mapBotMessageCustomer = (r: any): BotMessageCustomer => ({
   messageCount: r.messageCount ?? 0,
 })
 
-export const mapSetting = (r: any): Setting => ({ id: r.id, label: r.label, desc: r.description ?? '', value: r.value ?? '', textarea: r.inputType === 'textarea' })
+export const mapSetting = (r: any): Setting => ({
+  id: r.id,
+  label: r.label,
+  desc: r.description ?? '',
+  value: r.value ?? '',
+  textarea: r.inputType === 'textarea',
+  inputType: r.inputType ?? 'text',
+  category: r.category ?? 'general',
+  placeholders: Array.isArray(r.placeholders) ? r.placeholders : [],
+})
 
 export const mapUser = (r: any): User => ({ id: r.id, username: r.username, name: r.fullName, password: '', super: r.isSuper })
 
@@ -249,7 +258,7 @@ export const api = {
   menusList: (p: { page?: number; limit?: number }) => getPaged('/menus', p, mapMenu),
   stockList: (p: { page?: number; limit?: number }) => getPaged('/stock', p, mapStock),
   usersList: (p: { page?: number; limit?: number }) => getPaged('/users', p, mapUser),
-  settingsList: (p: { page?: number; limit?: number }) => getPaged('/settings', p, mapSetting),
+  settingsList: (p: { page?: number; limit?: number }) => getPaged('/settings', { ...p, limit: 200 }, mapSetting),
 
   // detail
   order: (id: number) => rawRequest('GET', `/orders/${id}`).then((e) => mapOrderDetail(e.data)),

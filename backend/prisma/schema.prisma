@@ -357,9 +357,12 @@ model Setting {
   label       String   @unique
   value       String?
   description String?                          // [CMS] teks bantuan di layar Settings
-  inputType   String   @default("text") @map("input_type") // [CMS] 'text' | 'textarea'
+  inputType   String   @default("text") @map("input_type") // [CMS] 'text' | 'textarea' | 'html'
+  category    String   @default("general")
+  placeholders String?
   sortOrder   Int      @default(0) @map("sort_order")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  @@index([category])
   @@map("settings")
 }
