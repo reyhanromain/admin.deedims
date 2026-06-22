@@ -2,6 +2,8 @@ tunnel: b5311bc4-b39a-4da0-ab79-4520e838b45e
 credentials-file: /etc/cloudflared/credentials.json
 
 ingress:
+  - hostname: app.deedims.biz.id
+    service: http://frontend:80
   - hostname: admin.deedims.biz.id
     service: http://frontend:80
   - service: http_status:404
