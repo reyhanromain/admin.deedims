@@ -70,8 +70,15 @@ describe('settings & subscribers', () => {
   it('list settings membawa metadata template bot', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/settings?limit=200', headers: authH(token) })
     const start = data(res).find((s: { label: string }) => s.label === 'start_open')
+    const cartSummary = data(res).find((s: { label: string }) => s.label === 'cart_summary')
+    const orderRow = data(res).find((s: { label: string }) => s.label === 'my_orders_list_row')
+    const reminder = data(res).find((s: { label: string }) => s.label === 'preorder_reminder_notification')
     expect(start).toMatchObject({ inputType: 'html', category: 'bot_messages_start' })
     expect(start.placeholders).toContain('preorder_title')
+    expect(start.value).toContain('Pekan pengambilan/pengiriman: {{fulfillment_week}}')
+    expect(cartSummary).toMatchObject({ inputType: 'html', category: 'bot_messages_cart' })
+    expect(orderRow.placeholders).toContain('order_status')
+    expect(reminder.value).toContain('Pekan pengambilan/pengiriman: {{fulfillment_week}}')
   })
   it('template bot menolak placeholder tidak dikenal', async () => {
     const setting = await prisma.setting.findUniqueOrThrow({ where: { label: 'start_open' } })
@@ -88,6 +95,15 @@ describe('settings & subscribers', () => {
   it('template bot merender newline biasa dan br secara eksplisit', async () => {
     await prisma.setting.update({ where: { label: 'reminder_subscribed' }, data: { value: 'Baris 1\nBaris 2<br>Baris 3' } })
     await expect(renderTemplate('reminder_subscribed')).resolves.toBe('Baris 1\nBaris 2\nBaris 3')
+  })
+  it('template start_open menampilkan label fulfillment dari template', async () => {
+    await expect(renderTemplate('start_open', {
+      intro: 'Halo kak',
+      preorder_title: 'PO Juni',
+      preorder_description: 'Batch akhir bulan',
+      fulfillment_week: '22–26 Juni 2026',
+      fulfillment_note: 'Ambil sore',
+    })).resolves.toContain('Pekan pengambilan/pengiriman: 22–26 Juni 2026')
   })
   it('list subscribers ramping + paginated', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/subscribers', headers: authH(token) })

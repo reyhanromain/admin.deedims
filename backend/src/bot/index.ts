@@ -110,8 +110,8 @@ export function createBot(token = config.botToken): Bot | null {
         intro,
         preorder_title: preOrder.title ?? '',
         preorder_description: preOrder.description ?? '',
-        fulfillment_week: fulfillmentWeek ? `\nPekan pengambilan/pengiriman: ${fulfillmentWeek}` : '',
-        fulfillment_note: preOrder.fulfillmentNote ? `\nCatatan: ${preOrder.fulfillmentNote}` : '',
+        fulfillment_week: fulfillmentWeek ?? '',
+        fulfillment_note: preOrder.fulfillmentNote ?? '',
       })
     })
   })
@@ -176,7 +176,7 @@ async function handleCallback(ctx: Context, user: TelegramCustomer, data: string
     if (p[1] === 'empty') return editTemplate(ctx, 'cart_empty_confirm', {}, new InlineKeyboard().text('Yes, empty cart', 'c:empty_yes').row().text('Back', 'c:back'))
     if (p[1] === 'empty_yes') { await clearCart(user.id); return editTemplate(ctx, 'cart_emptied') }
     if (p[1] === 'edit') return showCartEditor(ctx, user, positive(p[2]), true)
-    if (p[1] === 'del') { await deleteCartItem(user.id, positive(p[2])); return showCartEditor(ctx, user, positive(p[3]), true, 'Item berhasil dihapus dari keranjang kak.\n\n') }
+    if (p[1] === 'del') { await deleteCartItem(user.id, positive(p[2])); return showCartEditor(ctx, user, positive(p[3]), true, await renderTemplate('cart_item_deleted_prefix')) }
     if (p[1] === 'checkout') return showPayment(ctx, user)
     if (p[1] === 'cod') {
       const order = await checkout(user)
@@ -191,8 +191,12 @@ async function handleCallback(ctx: Context, user: TelegramCustomer, data: string
     if (p[1] === 'request') { const result = await requestOrderCancellation(user.id, positive(p[2])); return editTemplate(ctx, result.alreadyRequested ? 'order_cancel_request_exists' : 'order_cancel_request_sent') }
     if (p[1] === 'reorder') {
       const result = await reorderCompleted(user.id, positive(p[2]))
-      const notes = [result.filtered ? 'Beberapa item yang sudah tidak tersedia tidak ikut ditambahkan.' : null, result.priceChanged ? 'Ada item dengan perubahan harga, jadi total bisa berbeda dari order sebelumnya.' : null].filter(Boolean)
-      return editTemplate(ctx, 'reorder_success', { notes: notes.length ? `\n\nCatatan:\n- ${notes.join('\n- ')}` : '' })
+      const notes = [
+        result.filtered ? await renderTemplate('reorder_filtered_note') : null,
+        result.priceChanged ? await renderTemplate('reorder_price_changed_note') : null,
+      ].filter((note): note is string => Boolean(note))
+      const noteBlock = notes.length ? `\n\n${await renderTemplate('reorder_note_header')}\n- ${notes.join('\n- ')}` : ''
+      return editTemplate(ctx, 'reorder_success', { notes: noteBlock })
     }
   }
   return editTemplate(ctx, 'stale_choice')
@@ -226,7 +230,11 @@ async function showMenu(ctx: Context, _user: TelegramCustomer, menuId: number, p
   const keyboard = new InlineKeyboard()
   for (const variant of menu.variants) keyboard.text(`${visibleVariantName(variant.name) ?? 'Add to cart'} - ${money(variant.price)}`, `o:v:${variant.id}:${page}`).row()
   keyboard.text('Back to menu', `o:p:${page}`).row().text('Cancel', 'o:cancel')
-  const text = [menu.name, '', menu.description, '', menu.variants.length > 1 ? 'Silakan pilih varian yang kakak mau.' : 'Mau tambahkan menu ini ke cart, kak?'].filter(Boolean).join('\n')
+  const text = await renderTemplate('menu_detail', {
+    menu_name: menu.name,
+    menu_description: menu.description ?? '',
+    prompt: await renderTemplate(menu.variants.length > 1 ? 'menu_detail_variant_prompt' : 'menu_detail_add_prompt'),
+  })
   if (editing && (menu.telegramFileId || menu.imageUrl)) return editMenuPhoto(ctx, menu, text, keyboard)
   return respond(ctx, editing, text, keyboard)
 }
@@ -240,8 +248,17 @@ async function showQuantity(ctx: Context, user: TelegramCustomer, variantId: num
   for (let qty = 1; qty <= Math.min(3, capacity); qty++) keyboard.text(`Add ${qty}${unitLabel ? ` ${unitLabel}` : ''}`, `o:q:${variantId}:${qty}:${page}`).row()
   keyboard.text('Back', `o:m:${variant.menuId}:${page}`).row().text('Cancel', 'o:cancel')
   const contents = variant.stockUsages.map((usage) => `${usage.quantity}${usage.stockItem.unit ? ` ${usage.stockItem.unit}` : ''} ${usage.stockItem.name}`)
-  const contentText = contents.length === 1 ? `Isi: ${contents[0]}\n` : contents.length > 1 ? `Isi:\n${contents.map((item) => `- ${item}`).join('\n')}\n` : ''
-  const caption = `${variant.menu.name}\n${visibleVariantName(variant.name) ? `Varian: ${variant.name}\n` : ''}${contentText}Harga: ${money(variant.price)}\n\nPilih jumlah yang ingin ditambahkan.`
+  const contentBlock = contents.length === 1
+    ? await renderTemplate('variant_quantity_single_content', { content: contents[0] })
+    : contents.length > 1
+      ? await renderTemplate('variant_quantity_multi_content', { contents: contents.map((item) => `- ${item}`).join('\n') })
+      : ''
+  const caption = await renderTemplate('variant_quantity_prompt', {
+    menu_name: variant.menu.name,
+    variant_line: visibleVariantName(variant.name) ? await renderTemplate('variant_quantity_variant_line', { variant_name: variant.name }) : '',
+    content_block: contentBlock,
+    price: money(variant.price),
+  })
   const imageUrl = variant.imageUrl ?? variant.menu.imageUrl
   if (imageUrl) return editMenuPhoto(ctx, { id: variant.menuId, imageUrl, telegramFileId: null }, caption, keyboard)
   return edit(ctx, caption, keyboard)
@@ -267,7 +284,8 @@ async function showAddConfirmation(ctx: Context, variantId: number, qty: number,
   const freeAddons = await listAutomaticFreeAddonVariants(variant.menuId)
   const addon = addonVariantId ? await prisma.menuVariant.findUnique({ where: { id: addonVariantId }, include: { menu: true } }) : null
   const freeLines = freeAddons.map((item) => `${item.menu.name}${visibleVariantName(item.name) ? ` (${item.name})` : ''} x${qty} (Free)`)
-  const text = [`Berikut yang akan ditambahkan ke keranjang:`, '', `${variant.menu.name}${visibleVariantName(variant.name) ? ` (${variant.name})` : ''} x${qty}`, ...freeLines, addon ? `Add-on: ${addon.menu.name}${visibleVariantName(addon.name) ? ` (${addon.name})` : ''} x${qty}` : 'Tanpa add-on berbayar', '', 'Mau tambahkan ke cart, kak?'].join('\n')
+  const selection = [`${variant.menu.name}${visibleVariantName(variant.name) ? ` (${variant.name})` : ''} x${qty}`, ...freeLines, addon ? `Add-on: ${addon.menu.name}${visibleVariantName(addon.name) ? ` (${addon.name})` : ''} x${qty}` : 'Tanpa add-on berbayar'].join('\n')
+  const text = await renderTemplate('add_confirmation', { selection })
   const keyboard = new InlineKeyboard().text('Add to cart', `o:add:${variantId}:${qty}:${addonVariantId}:${page}`).row().text('Choose different add-on', `o:q:${variantId}:${qty}:${page}`).row().text('Back to menu', `o:p:${page}`).row().text('Cancel', 'o:cancel')
   return edit(ctx, text, keyboard)
 }
@@ -275,20 +293,34 @@ async function showAddConfirmation(ctx: Context, variantId: number, qty: number,
 async function showCart(ctx: Context, user: TelegramCustomer, editing: boolean) {
   const cart = await getCart(user.id)
   if (!cart.main.length) return respondTemplate(ctx, editing, 'cart_empty')
-  const lines = ['Keranjang kakak 🛒', '']
-  cart.main.forEach((item, index) => {
-    lines.push(`${index + 1}. ${item.menuNameSnapshot}`, ...(item.variantNameSnapshot ? [`   Varian: ${item.variantNameSnapshot}`] : []), `   Qty: ${item.quantity}`, `   Harga: ${money(item.unitPrice)}`, `   Subtotal: ${money(item.unitPrice * item.quantity)}`)
-    for (const addon of item.addons) lines.push(`   Add-on: ${addon.menuNameSnapshot}${addon.variantNameSnapshot ? ` (${addon.variantNameSnapshot})` : ''} x${addon.quantity} — ${money(addon.unitPrice * addon.quantity)}`)
-    lines.push('')
+  const itemLines: string[] = []
+  for (const [index, item] of cart.main.entries()) {
+    itemLines.push(await renderTemplate('cart_item_line', {
+      number: index + 1,
+      menu_name: item.menuNameSnapshot,
+      variant_name: item.variantNameSnapshot ? ` (${item.variantNameSnapshot})` : '',
+      quantity: item.quantity,
+      line_total: money(item.unitPrice * item.quantity),
+    }))
+    for (const addon of item.addons) itemLines.push(await renderTemplate('cart_addon_line', {
+      menu_name: addon.menuNameSnapshot,
+      variant_name: addon.variantNameSnapshot ? ` (${addon.variantNameSnapshot})` : '',
+      quantity: addon.quantity,
+      line_total: money(addon.unitPrice * addon.quantity),
+    }))
+  }
+  const stockLines = cart.stock.map((stock) => `- ${stock.name}: ${stock.required} ${stock.unit ?? ''} / tersedia ${stock.available} ${stock.unit ?? ''}`).join('\n')
+  const text = await renderTemplate('cart_summary', {
+    items: itemLines.join('\n'),
+    total: money(cart.total),
+    stock_lines: stockLines,
+    stock_status: await renderTemplate(cart.stockSufficient ? 'cart_stock_status_sufficient' : 'cart_stock_status_insufficient'),
   })
-  lines.push(`Total harga: ${money(cart.total)}`, '', 'Total stock di keranjang:')
-  for (const stock of cart.stock) lines.push(`- ${stock.name}: ${stock.required} ${stock.unit ?? ''} / tersedia ${stock.available} ${stock.unit ?? ''}`)
-  lines.push('', `Status stock: ${cart.stockSufficient ? 'Cukup' : 'Tidak cukup'}`)
   const keyboard = new InlineKeyboard()
   if (cart.stockSufficient) keyboard.text('Check out', 'c:checkout').row()
   else keyboard.text('Edit Cart', 'c:edit:1').row()
   keyboard.text('Empty cart', 'c:empty')
-  return respond(ctx, editing, lines.join('\n'), keyboard)
+  return respond(ctx, editing, text, keyboard)
 }
 
 async function showCartEditor(ctx: Context, user: TelegramCustomer, requestedPage: number, editing: boolean, prefix = '') {
@@ -307,7 +339,7 @@ async function showCartEditor(ctx: Context, user: TelegramCustomer, requestedPag
 
 async function showPayment(ctx: Context, user: TelegramCustomer) {
   const preview = await checkoutPreview(user.id)
-  return editTemplate(ctx, 'payment_prompt', { total: money(preview.total), price_changed: preview.priceChanged ? '\nHarga menu terbaru sudah diterapkan pada total ini.' : '' }, new InlineKeyboard().text('COD', 'c:cod').row().text('Back', 'c:back'))
+  return editTemplate(ctx, 'payment_prompt', { total: money(preview.total), price_changed_note: preview.priceChanged ? await renderTemplate('payment_price_changed_note') : '' }, new InlineKeyboard().text('COD', 'c:cod').row().text('Back', 'c:back'))
 }
 
 async function showOrderList(ctx: Context, user: TelegramCustomer, requestedPage: number, editing: boolean) {
@@ -316,7 +348,13 @@ async function showOrderList(ctx: Context, user: TelegramCustomer, requestedPage
   if (!result.rows.length) return respondTemplate(ctx, editing, 'my_orders_empty')
   const header = await renderTemplate('my_orders_list_header')
   const lines = [header, '']
-  result.rows.forEach((order, index) => lines.push(`${index + 1}. ${order.orderCode}\n   Status: ${statusLabel(order.orderStatus)}\n   Total: ${money(order.totalAmount)}\n   Dibuat: ${formatJakarta(order.createdAt)}`, ''))
+  for (const [index, order] of result.rows.entries()) lines.push(await renderTemplate('my_orders_list_row', {
+    number: index + 1,
+    order_code: order.orderCode,
+    order_status: statusLabel(order.orderStatus),
+    total: money(order.totalAmount),
+    created_at: formatJakarta(order.createdAt),
+  }), '')
   const keyboard = new InlineKeyboard()
   result.rows.forEach((order, index) => keyboard.text(`${index + 1}. ${order.orderCode}`, `mo:d:${order.id}:${page}`).row())
   if (page > 1) keyboard.text('Prev', `mo:p:${page - 1}`)
@@ -328,17 +366,40 @@ async function showOrderList(ctx: Context, user: TelegramCustomer, requestedPage
 
 async function showOrderDetail(ctx: Context, user: TelegramCustomer, orderId: number, page: number, editing: boolean) {
   const order = await customerOrderDetail(user.id, orderId)
-  const lines = [`Detail order ${order.orderCode}`, '', `Status: ${statusLabel(order.orderStatus)}`, 'Pembayaran: COD', `Status pembayaran: ${paymentLabel(order.paymentStatus)}`, `Total: ${money(order.totalAmount)}`, `Dibuat: ${formatJakarta(order.createdAt)}`, `Terakhir diperbarui: ${formatJakarta(order.updatedAt)}`]
+  const lines = [await renderTemplate('order_detail_header', {
+    order_code: order.orderCode,
+    order_status: statusLabel(order.orderStatus),
+    payment_method: 'COD',
+    payment_status: paymentLabel(order.paymentStatus),
+    total: money(order.totalAmount),
+    created_at: formatJakarta(order.createdAt),
+    updated_at: formatJakarta(order.updatedAt),
+  })]
   if (order.preOrder) {
     const fulfillmentWeek = formatFulfillmentWeek(order.preOrder.fulfillmentStartDate, order.preOrder.fulfillmentEndDate)
-    lines.push('', 'Pre-order:', order.preOrder.title ?? '', ...(fulfillmentWeek ? [`Pekan pengambilan/pengiriman: ${fulfillmentWeek}`] : []), ...(order.preOrder.fulfillmentNote ? [`Catatan: ${order.preOrder.fulfillmentNote}`] : []))
+    lines.push('', await renderTemplate('order_detail_preorder', {
+      preorder_title: order.preOrder.title ?? '',
+      fulfillment_week: fulfillmentWeek ?? '',
+      fulfillment_note: order.preOrder.fulfillmentNote ?? '',
+    }))
   }
-  if (order.adminNotes) lines.push('', 'Catatan admin:', order.adminNotes)
-  lines.push('', 'Item:')
-  order.items.filter((item) => item.parentOrderItemId == null).forEach((item, index) => {
-    lines.push(`${index + 1}. ${item.menuNameSnapshot}${item.variantNameSnapshot ? ` (${item.variantNameSnapshot})` : ''} x${item.quantity}`, `   ${money(item.lineTotal)}`)
-    for (const addon of order.items.filter((candidate) => candidate.parentOrderItemId === item.id)) lines.push(`   Add-on: ${addon.menuNameSnapshot}${addon.variantNameSnapshot ? ` (${addon.variantNameSnapshot})` : ''} x${addon.quantity} — ${money(addon.lineTotal)}`)
-  })
+  if (order.adminNotes) lines.push('', await renderTemplate('order_detail_admin_notes', { admin_notes: order.adminNotes }))
+  lines.push('', await renderTemplate('order_detail_items_header'))
+  for (const [index, item] of order.items.filter((item) => item.parentOrderItemId == null).entries()) {
+    lines.push(await renderTemplate('order_detail_item_line', {
+      number: index + 1,
+      menu_name: item.menuNameSnapshot,
+      variant_name: item.variantNameSnapshot ? ` (${item.variantNameSnapshot})` : '',
+      quantity: item.quantity,
+      line_total: money(item.lineTotal),
+    }))
+    for (const addon of order.items.filter((candidate) => candidate.parentOrderItemId === item.id)) lines.push(await renderTemplate('order_detail_addon_line', {
+      menu_name: addon.menuNameSnapshot,
+      variant_name: addon.variantNameSnapshot ? ` (${addon.variantNameSnapshot})` : '',
+      quantity: addon.quantity,
+      line_total: money(addon.lineTotal),
+    }))
+  }
   const keyboard = new InlineKeyboard()
   if (order.orderStatus === 'submitted') keyboard.text('Cancel Order', `mo:cancel:${order.id}:${page}`).row()
   if (order.orderStatus === 'confirmed') keyboard.text('Request Cancel', `mo:request:${order.id}:${page}`).row()

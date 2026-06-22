@@ -1,5 +1,6 @@
 import { prisma } from '../db'
 import { formatFulfillmentWeek } from '../time'
+import { renderTemplate } from './templates'
 
 type SentMessage = { message_id: number; date: number }
 type Sender = (chatId: bigint, text: string, options?: Record<string, unknown>) => Promise<SentMessage>
@@ -51,7 +52,7 @@ export async function dispatchPreOrderReminders(preOrderId: number) {
     })
     if (existing?.status === 'sent') continue
     try {
-      await sendTelegramMessage(subscriber.telegramUserId, reminderText(preOrder), { preOrderId, intent: 'preorder_reminder' })
+      await sendTelegramMessage(subscriber.telegramUserId, await reminderText(preOrder), { preOrderId, intent: 'preorder_reminder' })
       await prisma.preOrderReminderLog.upsert({
         where: { preOrderId_telegramUserId: { preOrderId, telegramUserId: subscriber.telegramUserId } },
         create: { preOrderId, telegramUserId: subscriber.telegramUserId, status: 'sent' },
@@ -74,28 +75,21 @@ export async function notifyOrderStatus(orderId: number, event: 'status' | 'canc
   const order = await prisma.order.findUnique({ where: { id: orderId } })
   if (!order?.telegramUserId || !sender) return null
   const text = event === 'cancel_approved'
-    ? `Permintaan pembatalan order ${order.orderCode} sudah disetujui.\nStatus order: Dibatalkan.`
+    ? await renderTemplate('order_cancel_approved_notification', { order_code: order.orderCode, order_status: orderStatusLabel(order.orderStatus) })
     : event === 'cancel_rejected'
-      ? `Permintaan pembatalan order ${order.orderCode} belum dapat disetujui.\nSilakan hubungi admin jika memerlukan bantuan.`
-      : `Status order ${order.orderCode} diperbarui menjadi: ${orderStatusLabel(order.orderStatus)}.\nCek detail terbaru melalui /my_orders.`
+      ? await renderTemplate('order_cancel_rejected_notification', { order_code: order.orderCode })
+      : await renderTemplate('order_status_notification', { order_code: order.orderCode, order_status: orderStatusLabel(order.orderStatus) })
   return sendTelegramMessage(order.telegramUserId, text, { orderId, intent: `order_${event}` })
 }
 
-function reminderText(preOrder: { title: string | null; description: string | null; fulfillmentStartDate: Date | null; fulfillmentEndDate: Date | null; fulfillmentNote: string | null }) {
+async function reminderText(preOrder: { title: string | null; description: string | null; fulfillmentStartDate: Date | null; fulfillmentEndDate: Date | null; fulfillmentNote: string | null }) {
   const fulfillmentWeek = formatFulfillmentWeek(preOrder.fulfillmentStartDate, preOrder.fulfillmentEndDate)
-  return [
-    'Halo kak 👋',
-    'Pre-order Deedims sudah dibuka ya!',
-    '',
-    preOrder.title,
-    preOrder.description,
-    fulfillmentWeek ? `Pekan pengambilan/pengiriman: ${fulfillmentWeek}` : null,
-    preOrder.fulfillmentNote ? `Catatan: ${preOrder.fulfillmentNote}` : null,
-    '',
-    'Kalau kakak mau pesan, silakan kirim /order.',
-    '',
-    'Kalau tidak ingin menerima reminder lagi, kirim /stop_preorder_reminder.',
-  ].filter((line): line is string => line != null).join('\n')
+  return renderTemplate('preorder_reminder_notification', {
+    preorder_title: preOrder.title ?? '',
+    preorder_description: preOrder.description ?? '',
+    fulfillment_week: fulfillmentWeek ?? '',
+    fulfillment_note: preOrder.fulfillmentNote ?? '',
+  })
 }
 
 function orderStatusLabel(status: string) {
