@@ -58,12 +58,24 @@ export function Settings() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         {Object.entries(grouped).map(([category, settings]) => (
           <div key={category} style={{ display: 'grid', gap: 12 }}>
-            <h3 style={{ margin: 0, fontSize: 15, color: t.ink }}>{categoryLabels[category] ?? category}</h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <h3 style={{ margin: 0, fontSize: 15, color: t.ink }}>{categoryLabels[category] ?? category}</h3>
+              <HoverButton
+                onClick={() => s.saveSettings(settings.map((setting) => setting.id).filter((id): id is number => id != null))}
+                style={{ border: 'none', background: settings.some((setting) => setting.value !== setting.savedValue) ? BRAND.terracotta : t.solidBg, color: '#fff', fontSize: 12.5, fontWeight: 800, borderRadius: 10, padding: '8px 13px', opacity: settings.some((setting) => setting.value !== setting.savedValue) ? 1 : 0.7 }}
+                hover={{ background: settings.some((setting) => setting.value !== setting.savedValue) ? BRAND.terracottaDark : t.solidBg }}
+              >
+                Save {categoryLabels[category] ?? category}
+              </HoverButton>
+            </div>
             {settings.map((st) => {
               const index = list.rows.findIndex((candidate) => candidate.id === st.id)
               return (
                 <div key={st.label} style={cardStyle(t, { padding: '18px 20px' })}>
-                  <label style={{ fontSize: 13, fontWeight: 700, fontFamily: 'monospace' }}>{st.label}</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+                    <label style={{ fontSize: 13, fontWeight: 700, fontFamily: 'monospace' }}>{st.label}</label>
+                    {st.value !== st.savedValue ? <span style={{ fontSize: 11, fontWeight: 800, color: BRAND.terracotta }}>Unsaved</span> : null}
+                  </div>
                   <div style={{ fontSize: 12, color: t.faint, margin: '4px 0 10px 0' }}>{st.desc}</div>
                   {st.inputType === 'html' ? (
                     <HtmlTemplateEditor value={st.value} placeholders={st.placeholders} theme={t} onChange={(value) => s.updateSetting(index, value)} />
@@ -88,11 +100,11 @@ export function Settings() {
         ))}
       </div>
       <HoverButton
-        onClick={() => s.showToast('Settings disimpan — bot langsung pakai nilai baru')}
+        onClick={() => s.showToast('Gunakan tombol Save di setiap section untuk menyimpan perubahan')}
         style={{ marginTop: 16, border: 'none', background: BRAND.terracotta, color: '#fff', fontSize: 13.5, fontWeight: 700, borderRadius: 10, padding: '11px 22px' }}
         hover={{ background: BRAND.terracottaDark }}
       >
-        Simpan settings
+        Info save settings
       </HoverButton>
     </section>
   )

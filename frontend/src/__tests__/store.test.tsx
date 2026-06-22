@@ -58,7 +58,7 @@ beforeEach(() => {
   api.stockList.mockResolvedValue(paged([stockRow]))
   api.updateStock.mockResolvedValue({ id: 1, label: 'satu', name: 'Stock Satu', quantity: 12, unit: 'pack' })
   api.usersList.mockResolvedValue(paged(users))
-  api.settingsList.mockResolvedValue(paged([{ id: 7, label: 'k', desc: 'd', value: 'v', textarea: false, inputType: 'text', category: 'general', placeholders: [] }]))
+  api.settingsList.mockResolvedValue(paged([{ id: 7, label: 'k', desc: 'd', value: 'v', savedValue: 'v', textarea: false, inputType: 'text', category: 'general', placeholders: [] }]))
 })
 
 const render = () => renderHook(() => useAdmin(), { wrapper: AdminProvider }).result
@@ -276,5 +276,19 @@ describe('doLogin', () => {
     expect(apiMod.setToken).toHaveBeenCalledWith('t0ken')
     expect(r.current.currentUser).toMatchObject({ username: 'admin' })
     expect(r.current.toast).toContain('Selamat datang, Dee')
+  })
+})
+
+describe('settings save', () => {
+  it('edit is local until section save', async () => {
+    const r = await mountAuthed()
+    await goto(r, 'settings')
+
+    act(() => r.current.updateSetting(0, 'baru'))
+    expect(api.updateSetting).not.toHaveBeenCalled()
+
+    act(() => r.current.saveSettings([7]))
+    await waitFor(() => expect(api.updateSetting).toHaveBeenCalledWith(7, 'baru'))
+    await waitFor(() => expect(r.current.lists.settings.rows[0].savedValue).toBe('baru'))
   })
 })

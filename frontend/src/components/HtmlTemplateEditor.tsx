@@ -1,93 +1,92 @@
-import { useEffect } from 'react'
-import { EditorContent, useEditor } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import Underline from '@tiptap/extension-underline'
-import Link from '@tiptap/extension-link'
+import { useRef } from 'react'
 import type { Theme } from '../theme'
 import { inputStyle } from '../styles'
 import { HoverButton } from '../ui'
 
 const tools = [
-  { label: 'B', action: 'bold' },
-  { label: 'I', action: 'italic' },
-  { label: 'U', action: 'underline' },
-  { label: 'S', action: 'strike' },
-  { label: '</>', action: 'code' },
+  { label: 'B', before: '<b>', after: '</b>' },
+  { label: 'I', before: '<i>', after: '</i>' },
+  { label: 'U', before: '<u>', after: '</u>' },
+  { label: 'S', before: '<s>', after: '</s>' },
+  { label: '</>', before: '<code>', after: '</code>' },
 ] as const
 
 export function HtmlTemplateEditor({ value, placeholders, theme, onChange }: { value: string; placeholders: string[]; theme: Theme; onChange: (value: string) => void }) {
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({ heading: false, bulletList: false, orderedList: false, blockquote: false, horizontalRule: false }),
-      Underline,
-      Link.configure({ openOnClick: false, autolink: false, defaultProtocol: 'https' }),
-    ],
-    content: value || '',
-    editorProps: {
-      attributes: { style: `min-height: 132px; outline: none; line-height: 1.55; color: ${theme.ink};` },
-    },
-    onUpdate: ({ editor }) => onChange(editor.getHTML()),
-  })
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  useEffect(() => {
-    if (!editor || editor.getHTML() === (value || '')) return
-    editor.commands.setContent(value || '', { emitUpdate: false })
-  }, [editor, value])
-
-  const buttonStyle = (active = false) => ({
-    border: `1px solid ${active ? theme.green : theme.border}`,
-    background: active ? theme.itemBg : theme.surface,
-    color: active ? theme.green : theme.ink,
+  const buttonStyle = {
+    border: `1px solid ${theme.border}`,
+    background: theme.surface,
+    color: theme.ink,
     borderRadius: 8,
     padding: '7px 10px',
     fontSize: 12,
     fontWeight: 800,
-  })
+  }
 
-  const runTool = (action: typeof tools[number]['action']) => {
-    if (!editor) return
-    if (action === 'bold') editor.chain().focus().toggleBold().run()
-    if (action === 'italic') editor.chain().focus().toggleItalic().run()
-    if (action === 'underline') editor.chain().focus().toggleUnderline().run()
-    if (action === 'strike') editor.chain().focus().toggleStrike().run()
-    if (action === 'code') editor.chain().focus().toggleCode().run()
+  const insertAtSelection = (before: string, after = '') => {
+    const textarea = textareaRef.current
+    if (!textarea) return onChange(`${value}${before}${after}`)
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const selected = value.slice(start, end)
+    const next = `${value.slice(0, start)}${before}${selected}${after}${value.slice(end)}`
+    onChange(next)
+    requestAnimationFrame(() => {
+      textarea.focus()
+      const cursorStart = start + before.length
+      const cursorEnd = cursorStart + selected.length
+      textarea.setSelectionRange(cursorStart, cursorEnd)
+    })
   }
 
   const setLink = () => {
-    if (!editor) return
-    const current = editor.getAttributes('link').href as string | undefined
-    const href = window.prompt('URL link', current ?? 'https://')
-    if (href === null) return
-    if (!href.trim()) editor.chain().focus().unsetLink().run()
-    else editor.chain().focus().setLink({ href: href.trim() }).run()
+    const href = window.prompt('URL link', 'https://')
+    if (!href?.trim()) return
+    insertAtSelection(`<a href="${href.trim()}">`, '</a>')
   }
 
   return (
     <div style={{ display: 'grid', gap: 10 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         {tools.map((tool) => (
-          <button key={tool.action} type="button" onClick={() => runTool(tool.action)} style={buttonStyle(editor?.isActive(tool.action) ?? false)}>{tool.label}</button>
+          <button key={tool.label} type="button" onClick={() => insertAtSelection(tool.before, tool.after)} style={buttonStyle}>{tool.label}</button>
         ))}
-        <button type="button" onClick={setLink} style={buttonStyle(editor?.isActive('link') ?? false)}>Link</button>
-        <button type="button" onClick={() => editor?.chain().focus().undo().run()} style={buttonStyle()}>Undo</button>
-        <button type="button" onClick={() => editor?.chain().focus().redo().run()} style={buttonStyle()}>Redo</button>
+        <button type="button" onClick={setLink} style={buttonStyle}>Link</button>
+        <button type="button" onClick={() => insertAtSelection('<br>')} style={buttonStyle}>Line break</button>
       </div>
       {placeholders.length ? (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {placeholders.map((name) => (
-            <HoverButton key={name} onClick={() => editor?.chain().focus().insertContent(`{{${name}}}`).run()} style={{ border: `1px solid ${theme.border}`, background: theme.surfaceAlt, color: theme.muted, borderRadius: 999, padding: '5px 9px', fontSize: 11, fontWeight: 800 }}>
+            <HoverButton key={name} onClick={() => insertAtSelection(`{{${name}}}`)} style={{ border: `1px solid ${theme.border}`, background: theme.surfaceAlt, color: theme.muted, borderRadius: 999, padding: '5px 9px', fontSize: 11, fontWeight: 800 }}>
               {'{{' + name + '}}'}
             </HoverButton>
           ))}
         </div>
       ) : null}
-      <div style={inputStyle(theme, { minHeight: 150, cursor: 'text' })} onClick={() => editor?.chain().focus().run()}>
-        <EditorContent editor={editor} />
+      <textarea
+        ref={textareaRef}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        rows={8}
+        spellCheck={false}
+        style={inputStyle(theme, { minHeight: 170, resize: 'vertical', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace', fontSize: 13, lineHeight: 1.55, whiteSpace: 'pre-wrap' })}
+      />
+      <div style={{ fontSize: 12, color: theme.faint }}>
+        Semua markup terlihat dan tersimpan apa adanya. Enter = newline biasa. Gunakan <code>&lt;br&gt;</code> jika ingin line break HTML eksplisit Telegram.
       </div>
       <details style={{ fontSize: 12, color: theme.faint }}>
-        <summary style={{ cursor: 'pointer', fontWeight: 700 }}>HTML preview</summary>
-        <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: '8px 0 0', padding: 10, borderRadius: 8, background: theme.surfaceAlt }}>{value}</pre>
+        <summary style={{ cursor: 'pointer', fontWeight: 700 }}>Telegram preview</summary>
+        <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: '8px 0 0', padding: 10, borderRadius: 8, background: theme.surfaceAlt }}>{telegramPreview(value)}</pre>
       </details>
     </div>
   )
+}
+
+function telegramPreview(value: string) {
+  return value
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/?(b|strong|i|em|u|ins|s|strike|del|code|pre)>/gi, '')
+    .replace(/<a\s+href=("[^"]+"|'[^']+')>/gi, '')
+    .replace(/<\/a>/gi, '')
 }

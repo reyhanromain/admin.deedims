@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 import { makeApp, resetDb, tokenFor, authH, prisma, data, meta, errOf } from './helpers'
+import { renderTemplate } from '../src/bot/templates'
 
 let app: FastifyInstance
 let token: string
@@ -83,6 +84,10 @@ describe('settings & subscribers', () => {
     const res = await app.inject({ method: 'PATCH', url: `/api/settings/${setting.id}`, headers: authH(token), payload: { value: '<h1>Halo</h1>' } })
     expect(res.statusCode).toBe(400)
     expect(errOf(res).code).toBe('VALIDATION')
+  })
+  it('template bot merender newline biasa dan br secara eksplisit', async () => {
+    await prisma.setting.update({ where: { label: 'reminder_subscribed' }, data: { value: 'Baris 1\nBaris 2<br>Baris 3' } })
+    await expect(renderTemplate('reminder_subscribed')).resolves.toBe('Baris 1\nBaris 2\nBaris 3')
   })
   it('list subscribers ramping + paginated', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/subscribers', headers: authH(token) })
