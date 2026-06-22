@@ -4,6 +4,19 @@ All notable product changes for Deedims are tracked here.
 
 This project follows [Semantic Versioning](https://semver.org/) for the deployable product version and [Conventional Commits](https://www.conventionalcommits.org/) for commit messages.
 
+## [2.3.0] - 2026-06-22
+
+### Added
+
+- Add editable bot message templates in Settings with explicit HTML source editing, placeholders, and per-section save controls.
+- Add organized Settings message tabs with sticky tab navigation and sticky section save headers.
+- Expose customer-facing bot copy for start, order, cart, my orders, order detail, reorder, and notification messages so labels are editable instead of hidden in code.
+
+### Fixed
+
+- Delete previous inline-button bot replies when customers send a new command.
+- Show fulfillment week labels directly in the editable `/start` and notification templates.
+
 ## [2.2.0] - 2026-06-22
 
 ### Added
