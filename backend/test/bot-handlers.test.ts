@@ -162,6 +162,24 @@ describe('grammY customer handlers', () => {
     expect((await prisma.customer.findUniqueOrThrow({ where: { telegramUserId: 222n } })).activeOrderMessageId).toBeNull()
   })
 
+  it('command baru menghapus reply my_orders yang punya inline button', async () => {
+    const { bot, sent } = testBot()
+    await prisma.order.create({
+      data: {
+        orderCode: 'DD-222', preOrderId: 1, customerName: 'Budi', telegramUserId: 222n, telegramUsername: 'budi',
+        orderStatus: 'submitted', paymentStatus: 'pending', subtotalAmount: 10000, totalAmount: 10000,
+      },
+    })
+    await bot.init()
+    await bot.handleUpdate(messageUpdate('/my_orders'))
+    await bot.handleUpdate(messageUpdate('/start', 2))
+
+    expect(sent.some((call) => call.method === 'sendMessage' && String(call.payload.text).includes('Order kakak di Deedims'))).toBe(true)
+    expect(sent.some((call) => call.method === 'deleteMessage' && call.payload.message_id === 10)).toBe(true)
+    expect(sent.some((call) => call.method === 'sendMessage' && String(call.payload.text).includes('Pre-order sedang dibuka'))).toBe(true)
+    expect((await prisma.customer.findUniqueOrThrow({ where: { telegramUserId: 222n } })).activeOrderMessageId).toBeNull()
+  })
+
   it('jika delete gagal, flow order diubah menjadi italic dan keyboard dikosongkan', async () => {
     const { bot, sent } = testBot({ deleteFails: true })
     await bot.init()

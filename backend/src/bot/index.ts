@@ -93,8 +93,12 @@ export function createBot(token = config.botToken): Bot | null {
     await next()
   })
 
-  bot.command('start', async (ctx) => {
+  bot.on('message:entities:bot_command', async (ctx, next) => {
     await cancelActiveOrderMessage(ctx)
+    await next()
+  })
+
+  bot.command('start', async (ctx) => {
     return guarded(ctx, async (user) => {
       const intro = await setting('start_quick_intro', 'Halo kak 👋\nSelamat datang di Deedims.')
       const { preOrder, menus } = await listOrderableMenus()
@@ -122,15 +126,12 @@ export function createBot(token = config.botToken): Bot | null {
   }))
 
   bot.command('order', async (ctx) => {
-    await cancelActiveOrderMessage(ctx)
     return guarded(ctx, async (user) => showMenuList(ctx, user, 1, false))
   })
   bot.command('carts', async (ctx) => {
-    await cancelActiveOrderMessage(ctx)
     return guarded(ctx, async (user) => showCart(ctx, user, false))
   })
   bot.command('my_orders', async (ctx) => {
-    await cancelActiveOrderMessage(ctx)
     return guarded(ctx, async (user) => showOrderList(ctx, user, 1, false))
   })
 
@@ -384,7 +385,9 @@ async function guarded(ctx: Context, action: (user: TelegramCustomer) => Promise
 
 async function reply(ctx: Context, text: string, keyboard?: InlineKeyboard) {
   if (!ctx.chat) return
-  return sendTelegramMessage(BigInt(ctx.chat.id), text, { intent: 'bot_reply' }, keyboard ? { reply_markup: keyboard } : undefined)
+  const sent = await sendTelegramMessage(BigInt(ctx.chat.id), text, { intent: 'bot_reply' }, keyboard ? { reply_markup: keyboard } : undefined)
+  if (sent && keyboard && ctx.from) await prisma.customer.updateMany({ where: { telegramUserId: BigInt(ctx.from.id) }, data: { activeOrderMessageId: BigInt(sent.message_id) } })
+  return sent
 }
 
 async function edit(ctx: Context, text: string, keyboard?: InlineKeyboard) {
