@@ -212,12 +212,22 @@ export const mapSetting = (r: any): Setting => ({
   id: r.id,
   label: r.label,
   desc: r.description ?? '',
-  value: r.value ?? '',
+  value: normalizeSettingValue(r.value ?? ''),
+  savedValue: normalizeSettingValue(r.value ?? ''),
   textarea: r.inputType === 'textarea',
   inputType: r.inputType ?? 'text',
   category: r.category ?? 'general',
   placeholders: Array.isArray(r.placeholders) ? r.placeholders : [],
 })
+
+function normalizeSettingValue(value: string) {
+  return value
+    .replace(/<p>\s*<\/p>/gi, '\n')
+    .replace(/<p>/gi, '')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '<br>')
+    .trim()
+}
 
 export const mapUser = (r: any): User => ({ id: r.id, username: r.username, name: r.fullName, password: '', super: r.isSuper })
 

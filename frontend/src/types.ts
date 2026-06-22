@@ -120,6 +120,7 @@ export interface Setting {
   label: string
   desc: string
   value: string
+  savedValue: string
   textarea: boolean
   inputType: string
   category: string

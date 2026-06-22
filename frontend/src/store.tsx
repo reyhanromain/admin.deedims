@@ -255,6 +255,7 @@ export interface AdminStore extends State {
   deleteUser: (username: string) => void
   // settings
   updateSetting: (index: number, value: string) => void
+  saveSettings: (ids: number[]) => void
   // image lightbox
   openImage: (img: string) => void
   closeLightbox: () => void
@@ -869,9 +870,17 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
       updateSetting: (index, value) => {
         update((s) => ({ lists: withRows(s, 'settings', (rows) => rows.map((x, j) => (j === index ? { ...x, value } : x))) }))
-        const setting = state.lists.settings.rows[index] as Setting | undefined
-        if (!setting || setting.id == null) return
-        debounceSave(`setting-${setting.id}`, () => void api.updateSetting(setting.id!, value).catch(fail))
+      },
+      saveSettings: (ids) => {
+        const targets = (stateRef.current.lists.settings.rows as Setting[]).filter((setting) => setting.id != null && ids.includes(setting.id) && setting.value !== setting.savedValue)
+        if (!targets.length) { showToast('Tidak ada perubahan settings'); return }
+        void (async () => {
+          try {
+            await Promise.all(targets.map((setting) => api.updateSetting(setting.id!, setting.value)))
+            update((s) => ({ lists: withRows(s, 'settings', (rows) => rows.map((row) => targets.some((target) => target.id === row.id) ? { ...row, savedValue: row.value } : row)) }))
+            showToast(`${targets.length} setting disimpan`)
+          } catch (e) { fail(e) }
+        })()
       },
 
       openImage: (img) => { if (img) set({ lightboxImage: img }); else showToast('Belum ada foto — buka Edit untuk menambah') },

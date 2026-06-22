@@ -88,7 +88,10 @@ describe('mapPreorderRow / mapCustomerRow / mapSubscriber / mapSetting / mapUser
   })
   it('setting: inputType textarea→true', () => {
     expect(mapSetting({ id: 1, label: 'k', value: 'v', description: 'd', inputType: 'textarea', category: 'general', placeholders: [] }))
-      .toEqual({ id: 1, label: 'k', desc: 'd', value: 'v', textarea: true, inputType: 'textarea', category: 'general', placeholders: [] })
+      .toEqual({ id: 1, label: 'k', desc: 'd', value: 'v', savedValue: 'v', textarea: true, inputType: 'textarea', category: 'general', placeholders: [] })
+  })
+  it('setting: normalizes legacy paragraph HTML into visible source text', () => {
+    expect(mapSetting({ id: 1, label: 'k', value: '<p>Halo</p><p>World</p>', inputType: 'html' }).value).toBe('Halo\nWorld')
   })
   it('user: fullName→name, isSuper→super', () => {
     expect(mapUser({ id: 2, username: 'staff', fullName: 'Staff', isSuper: false })).toEqual({ id: 2, username: 'staff', name: 'Staff', password: '', super: false })
