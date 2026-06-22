@@ -105,6 +105,7 @@ const starterSettings = [
     description: 'Pesan pembuka saat customer kirim /start',
     value: 'Halo kak, selamat datang di Deedims.',
     inputType: 'textarea',
+    category: 'bot_messages_start',
     sortOrder: 1,
   },
   {
@@ -112,6 +113,7 @@ const starterSettings = [
     description: 'Jumlah menu per halaman di /order',
     value: '8',
     inputType: 'text',
+    category: 'pagination',
     sortOrder: 2,
   },
   {
@@ -119,6 +121,7 @@ const starterSettings = [
     description: 'Jumlah item per halaman saat edit cart',
     value: '8',
     inputType: 'text',
+    category: 'pagination',
     sortOrder: 3,
   },
   {
@@ -126,6 +129,7 @@ const starterSettings = [
     description: 'Jumlah order per halaman di /my_orders',
     value: '5',
     inputType: 'text',
+    category: 'pagination',
     sortOrder: 4,
   },
 ]

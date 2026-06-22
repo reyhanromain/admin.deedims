@@ -20,6 +20,7 @@ import { menusRoutes } from './api/menus'
 import { preordersRoutes } from './api/preorders'
 import { subscribersRoutes } from './api/subscribers'
 import { uploadsRoutes } from './api/uploads'
+import { upsertBotMessageTemplates } from './bot/templates'
 
 /** Payload JWT yang kita tandatangani saat login. */
 export interface JwtPayload {
@@ -43,6 +44,8 @@ declare module 'fastify' {
 
 export async function buildServer() {
   const app = Fastify({ logger: !process.env.VITEST })
+
+  await upsertBotMessageTemplates()
 
   await app.register(cors, { origin: config.corsOrigin, credentials: true })
   await app.register(jwt, { secret: config.jwtSecret })
