@@ -121,6 +121,9 @@ export interface Setting {
   desc: string
   value: string
   textarea: boolean
+  inputType: string
+  category: string
+  placeholders: string[]
 }
 
 // ── View models untuk endpoint tailored (DTO ramping dari API) ──

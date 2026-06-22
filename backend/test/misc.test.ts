@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
-import { makeApp, resetDb, tokenFor, authH, prisma, data, meta } from './helpers'
+import { makeApp, resetDb, tokenFor, authH, prisma, data, meta, errOf } from './helpers'
 
 let app: FastifyInstance
 let token: string
@@ -65,6 +65,24 @@ describe('settings & subscribers', () => {
     const s = await prisma.setting.findFirstOrThrow()
     const res = await app.inject({ method: 'PATCH', url: `/api/settings/${s.id}`, headers: authH(token), payload: { value: 'baru' } })
     expect(data(res).value).toBe('baru')
+  })
+  it('list settings membawa metadata template bot', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/settings?limit=200', headers: authH(token) })
+    const start = data(res).find((s: { label: string }) => s.label === 'start_open')
+    expect(start).toMatchObject({ inputType: 'html', category: 'bot_messages_start' })
+    expect(start.placeholders).toContain('preorder_title')
+  })
+  it('template bot menolak placeholder tidak dikenal', async () => {
+    const setting = await prisma.setting.findUniqueOrThrow({ where: { label: 'start_open' } })
+    const res = await app.inject({ method: 'PATCH', url: `/api/settings/${setting.id}`, headers: authH(token), payload: { value: 'Halo {{typo}}' } })
+    expect(res.statusCode).toBe(400)
+    expect(errOf(res).code).toBe('VALIDATION')
+  })
+  it('template bot menolak tag HTML tidak didukung', async () => {
+    const setting = await prisma.setting.findUniqueOrThrow({ where: { label: 'start_open' } })
+    const res = await app.inject({ method: 'PATCH', url: `/api/settings/${setting.id}`, headers: authH(token), payload: { value: '<h1>Halo</h1>' } })
+    expect(res.statusCode).toBe(400)
+    expect(errOf(res).code).toBe('VALIDATION')
   })
   it('list subscribers ramping + paginated', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/subscribers', headers: authH(token) })

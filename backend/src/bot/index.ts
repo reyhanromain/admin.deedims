@@ -28,6 +28,7 @@ import {
   type TelegramCustomer,
 } from './service'
 import { registerTelegramSender, sendTelegramMessage } from './notifications'
+import { renderTemplate, type TemplateKey } from './templates'
 
 function messageType(ctx: GrammyContext): string {
   const m = ctx.message
@@ -102,27 +103,27 @@ export function createBot(token = config.botToken): Bot | null {
     return guarded(ctx, async (user) => {
       const intro = await setting('start_quick_intro', 'Halo kak 👋\nSelamat datang di Deedims.')
       const { preOrder, menus } = await listOrderableMenus()
-      if (!preOrder) return reply(ctx, `${intro}\n\nSaat ini pre-order belum dibuka ya kak.\n\nKalau kakak mau dikabari saat pre-order berikutnya dibuka, silakan kirim /remind_preorder.`)
-      if (!menus.length) return reply(ctx, `${intro}\n\nPre-order sedang dibuka, tapi menu yang bisa dipesan belum tersedia ya kak.\nSilakan cek lagi nanti.`)
+      if (!preOrder) return replyTemplate(ctx, 'start_closed', { intro })
+      if (!menus.length) return replyTemplate(ctx, 'start_empty_menu', { intro })
       const fulfillmentWeek = formatFulfillmentWeek(preOrder.fulfillmentStartDate, preOrder.fulfillmentEndDate)
-      return reply(ctx, [intro, '', 'Pre-order sedang dibuka ya kak 🎉', '', preOrder.title, preOrder.description,
-        fulfillmentWeek ? `Pekan pengambilan/pengiriman: ${fulfillmentWeek}` : null,
-        preOrder.fulfillmentNote ? `Catatan: ${preOrder.fulfillmentNote}` : null, '', 'Silakan kirim /order untuk memesan ya kak.'].filter(Boolean).join('\n'))
+      return replyTemplate(ctx, 'start_open', {
+        intro,
+        preorder_title: preOrder.title ?? '',
+        preorder_description: preOrder.description ?? '',
+        fulfillment_week: fulfillmentWeek ? `\nPekan pengambilan/pengiriman: ${fulfillmentWeek}` : '',
+        fulfillment_note: preOrder.fulfillmentNote ? `\nCatatan: ${preOrder.fulfillmentNote}` : '',
+      })
     })
   })
 
   bot.command('remind_preorder', async (ctx) => guarded(ctx, async (user) => {
     const result = await subscribeReminder(user)
-    return reply(ctx, result.alreadyActive
-      ? 'Kakak sudah masuk list reminder pre-order ya 😊\nNanti kalau pre-order dibuka, kakak akan dikabari di sini.\n\nKalau ingin berhenti menerima reminder, kirim /stop_preorder_reminder.'
-      : 'Siap kak 😊\nNanti kalau pre-order Deedims sudah dibuka, kakak akan dikabari di sini ya.\n\nKalau nanti tidak ingin menerima reminder lagi, kakak bisa kirim /stop_preorder_reminder.')
+    return replyTemplate(ctx, result.alreadyActive ? 'reminder_already_subscribed' : 'reminder_subscribed')
   }))
 
   bot.command('stop_preorder_reminder', async (ctx) => guarded(ctx, async (user) => {
     const result = await unsubscribeReminder(user.id)
-    return reply(ctx, result.wasActive
-      ? 'Baik kak, reminder pre-order sudah dihentikan.\nKakak tidak akan menerima notifikasi pre-order berikutnya lagi.'
-      : 'Kakak belum terdaftar di reminder pre-order ya.\nKalau ingin dikabari saat pre-order dibuka, kirim /remind_preorder.')
+    return replyTemplate(ctx, result.wasActive ? 'reminder_unsubscribed' : 'reminder_not_subscribed')
   }))
 
   bot.command('order', async (ctx) => {
@@ -140,7 +141,7 @@ export function createBot(token = config.botToken): Bot | null {
     await handleCallback(ctx, user, ctx.callbackQuery.data)
   }))
 
-  bot.on('message', (ctx) => reply(ctx, 'Maaf kak, pesan itu belum dikenali.\nSilakan gunakan /start, /order, /carts, atau /my_orders ya 😊'))
+  bot.on('message', (ctx) => replyTemplate(ctx, 'unknown_message'))
   bot.catch((error) => console.error('Bot handler error:', error.error))
   return bot
 }
@@ -158,49 +159,49 @@ async function handleCallback(ctx: Context, user: TelegramCustomer, data: string
     if (p[1] === 'cf') return showAddConfirmation(ctx, positive(p[2]), positive(p[3]), Number(p[4]), positive(p[5]))
     if (p[1] === 'add') {
       await addToCart({ telegramUserId: user.id, variantId: positive(p[2]), quantity: positive(p[3]), addonVariantId: Number(p[4]) || undefined })
-      await edit(ctx, 'Berhasil ditambahkan ke cart kak 😊\n\nKakak bisa lanjut pilih menu lain dengan /order, atau cek keranjang dengan /carts.')
+      await editTemplate(ctx, 'add_to_cart_success')
       await clearActiveOrderMessage(user.id)
       return
     }
-    if (p[1] === 'cancel') return edit(ctx, 'Kak, yakin mau membatalkan proses order ini?\n\nKalau dilanjutkan, semua isi cart kakak akan dikosongkan.', new InlineKeyboard().text('Yes, cancel order', 'o:cancel_yes').row().text('Back', 'o:p:1'))
+    if (p[1] === 'cancel') return editTemplate(ctx, 'order_flow_cancel_confirm', {}, new InlineKeyboard().text('Yes, cancel order', 'o:cancel_yes').row().text('Back', 'o:p:1'))
     if (p[1] === 'cancel_yes') {
       await clearCart(user.id)
-      await edit(ctx, 'Baik kak, proses order dibatalkan dan keranjang sudah dikosongkan.\n\nKalau mau mulai pesan lagi, silakan kirim /order ya 😊')
+      await editTemplate(ctx, 'order_cancelled')
       await clearActiveOrderMessage(user.id)
       return
     }
   }
   if (p[0] === 'c') {
     if (p[1] === 'back') return showCart(ctx, user, true)
-    if (p[1] === 'empty') return edit(ctx, 'Kak, yakin mau mengosongkan keranjang?\n\nSemua menu dan add-on yang sudah kakak pilih akan dihapus dari keranjang.', new InlineKeyboard().text('Yes, empty cart', 'c:empty_yes').row().text('Back', 'c:back'))
-    if (p[1] === 'empty_yes') { await clearCart(user.id); return edit(ctx, 'Keranjang berhasil dikosongkan kak.\n\nKalau kakak mau pesan lagi, silakan kirim /order ya 😊') }
+    if (p[1] === 'empty') return editTemplate(ctx, 'cart_empty_confirm', {}, new InlineKeyboard().text('Yes, empty cart', 'c:empty_yes').row().text('Back', 'c:back'))
+    if (p[1] === 'empty_yes') { await clearCart(user.id); return editTemplate(ctx, 'cart_emptied') }
     if (p[1] === 'edit') return showCartEditor(ctx, user, positive(p[2]), true)
     if (p[1] === 'del') { await deleteCartItem(user.id, positive(p[2])); return showCartEditor(ctx, user, positive(p[3]), true, 'Item berhasil dihapus dari keranjang kak.\n\n') }
     if (p[1] === 'checkout') return showPayment(ctx, user)
     if (p[1] === 'cod') {
       const order = await checkout(user)
-      return edit(ctx, `Order berhasil dibuat kak 🎉\n\nKode order: ${order.orderCode}\nTotal pembayaran: ${money(order.totalAmount)}\nMetode pembayaran: COD\n\nKakak bisa cek status order dengan /my_orders.`)
+      return editTemplate(ctx, 'checkout_success', { order_code: order.orderCode, total: money(order.totalAmount) })
     }
   }
   if (p[0] === 'mo') {
     if (p[1] === 'p' || p[1] === 'refresh') return showOrderList(ctx, user, positive(p[2]), true)
     if (p[1] === 'd') return showOrderDetail(ctx, user, positive(p[2]), positive(p[3]), true)
-    if (p[1] === 'cancel') return edit(ctx, `Kak, yakin mau membatalkan order ini?\n\nKalau dibatalkan, order ini tidak akan diproses.`, new InlineKeyboard().text('Yes, cancel order', `mo:cancel_yes:${p[2]}:${p[3]}`).row().text('Back', `mo:d:${p[2]}:${p[3]}`))
-    if (p[1] === 'cancel_yes') { const order = await cancelSubmittedOrder(user.id, positive(p[2])); return edit(ctx, `Order ${order.orderCode} berhasil dibatalkan kak.\n\nKalau mau pesan lagi, silakan kirim /order ya 😊`) }
-    if (p[1] === 'request') { const result = await requestOrderCancellation(user.id, positive(p[2])); return edit(ctx, result.alreadyRequested ? 'Permintaan pembatalan order ini sudah menunggu review admin.' : 'Permintaan pembatalan sudah dikirim ke admin ya kak.') }
+    if (p[1] === 'cancel') return editTemplate(ctx, 'order_cancel_confirm', {}, new InlineKeyboard().text('Yes, cancel order', `mo:cancel_yes:${p[2]}:${p[3]}`).row().text('Back', `mo:d:${p[2]}:${p[3]}`))
+    if (p[1] === 'cancel_yes') { const order = await cancelSubmittedOrder(user.id, positive(p[2])); return editTemplate(ctx, 'order_cancel_success', { order_code: order.orderCode }) }
+    if (p[1] === 'request') { const result = await requestOrderCancellation(user.id, positive(p[2])); return editTemplate(ctx, result.alreadyRequested ? 'order_cancel_request_exists' : 'order_cancel_request_sent') }
     if (p[1] === 'reorder') {
       const result = await reorderCompleted(user.id, positive(p[2]))
       const notes = [result.filtered ? 'Beberapa item yang sudah tidak tersedia tidak ikut ditambahkan.' : null, result.priceChanged ? 'Ada item dengan perubahan harga, jadi total bisa berbeda dari order sebelumnya.' : null].filter(Boolean)
-      return edit(ctx, `Order sebelumnya berhasil dimasukkan ke keranjang kak 😊${notes.length ? `\n\nCatatan:\n- ${notes.join('\n- ')}` : ''}\n\nSilakan cek keranjang dengan /carts sebelum checkout.`)
+      return editTemplate(ctx, 'reorder_success', { notes: notes.length ? `\n\nCatatan:\n- ${notes.join('\n- ')}` : '' })
     }
   }
-  return edit(ctx, 'Pilihan tersebut sudah tidak berlaku. Silakan mulai lagi dari command utama.')
+  return editTemplate(ctx, 'stale_choice')
 }
 
 async function showMenuList(ctx: Context, user: TelegramCustomer, requestedPage: number, editing: boolean) {
   const { preOrder, menus } = await listOrderableMenus()
-  if (!preOrder) return respond(ctx, editing, 'Saat ini pre-order belum dibuka ya kak.\nKirim /remind_preorder jika ingin mendapat kabar saat dibuka.')
-  if (!menus.length) return respond(ctx, editing, 'Pre-order sedang dibuka, tapi menu yang bisa dipesan belum tersedia ya kak.')
+  if (!preOrder) return respondTemplate(ctx, editing, 'order_closed')
+  if (!menus.length) return respondTemplate(ctx, editing, 'order_no_menu')
   const size = positive(await setting('order_menu_page_size', '8')) || 8
   const pages = Math.max(1, Math.ceil(menus.length / size))
   const page = Math.min(requestedPage, pages)
@@ -212,8 +213,8 @@ async function showMenuList(ctx: Context, user: TelegramCustomer, requestedPage:
     keyboard.row()
   }
   keyboard.text('Cancel', 'o:cancel')
-  if (editing) return edit(ctx, 'Silakan pilih menu yang ingin kakak pesan 😊\n\nKakak juga bisa cek keranjang sementara dengan /carts.', keyboard)
-  const sent = await reply(ctx, 'Silakan pilih menu yang ingin kakak pesan 😊\n\nKakak juga bisa cek keranjang sementara dengan /carts.', keyboard)
+  if (editing) return editTemplate(ctx, 'order_menu_list', {}, keyboard)
+  const sent = await replyTemplate(ctx, 'order_menu_list', {}, keyboard)
   if (sent) await prisma.customer.update({ where: { telegramUserId: user.id }, data: { activeOrderMessageId: BigInt(sent.message_id) } })
   return sent
 }
@@ -258,7 +259,7 @@ async function showAddons(ctx: Context, _user: TelegramCustomer, variantId: numb
   for (const { link, variant: addonVariant } of options.values()) keyboard.text(`${link.addonMenu.name}${visibleVariantName(addonVariant.name) ? ` ${addonVariant.name}` : ''} - ${money(addonVariant.price)}`, `o:cf:${variantId}:${qty}:${addonVariant.id}:${page}`).row()
   keyboard.text('Skip add-on', `o:cf:${variantId}:${qty}:0:${page}`).row().text('Back to menu', `o:p:${page}`).row().text('Cancel', 'o:cancel')
   const selection = [`- ${variant.menu.name} x${qty}`, ...freeAddons.map((addon) => `- ${addon.menu.name} x${qty} (Free)`)]
-  return edit(ctx, `Mau tambah pelengkap untuk menu ini, kak?\n\n${selection.join('\n')}\n\nKalau tidak perlu tambahan, kakak bisa pilih Skip add-on.`, keyboard)
+  return editTemplate(ctx, 'addon_prompt', { selection: selection.join('\n') }, keyboard)
 }
 
 async function showAddConfirmation(ctx: Context, variantId: number, qty: number, addonVariantId: number, page: number) {
@@ -273,7 +274,7 @@ async function showAddConfirmation(ctx: Context, variantId: number, qty: number,
 
 async function showCart(ctx: Context, user: TelegramCustomer, editing: boolean) {
   const cart = await getCart(user.id)
-  if (!cart.main.length) return respond(ctx, editing, 'Keranjang kakak masih kosong.\n\nKalau mau pesan, silakan kirim /order ya 😊')
+  if (!cart.main.length) return respondTemplate(ctx, editing, 'cart_empty')
   const lines = ['Keranjang kakak 🛒', '']
   cart.main.forEach((item, index) => {
     lines.push(`${index + 1}. ${item.menuNameSnapshot}`, ...(item.variantNameSnapshot ? [`   Varian: ${item.variantNameSnapshot}`] : []), `   Qty: ${item.quantity}`, `   Harga: ${money(item.unitPrice)}`, `   Subtotal: ${money(item.unitPrice * item.quantity)}`)
@@ -292,7 +293,7 @@ async function showCart(ctx: Context, user: TelegramCustomer, editing: boolean) 
 
 async function showCartEditor(ctx: Context, user: TelegramCustomer, requestedPage: number, editing: boolean, prefix = '') {
   const cart = await getCart(user.id)
-  if (!cart.main.length) return respond(ctx, editing, `${prefix}Sekarang keranjang kakak sudah kosong.\nKalau mau mulai pesan lagi, silakan kirim /order ya 😊`)
+  if (!cart.main.length) return respondTemplate(ctx, editing, 'cart_empty_after_delete', { prefix })
   const size = positive(await setting('cart_edit_page_size', '8')) || 8
   const pages = Math.max(1, Math.ceil(cart.main.length / size)); const page = Math.min(requestedPage, pages)
   const keyboard = new InlineKeyboard()
@@ -301,19 +302,20 @@ async function showCartEditor(ctx: Context, user: TelegramCustomer, requestedPag
   if (page < pages) keyboard.text('Next', `c:edit:${page + 1}`)
   if (pages > 1) keyboard.row()
   keyboard.text('Back', 'c:back')
-  return respond(ctx, editing, `${prefix}Pilih item yang ingin kakak hapus dari keranjang.\n\nSaat ini fitur edit hanya mendukung hapus item ya kak.`, keyboard)
+  return respondTemplate(ctx, editing, 'cart_edit_prompt', { prefix }, keyboard)
 }
 
 async function showPayment(ctx: Context, user: TelegramCustomer) {
   const preview = await checkoutPreview(user.id)
-  return edit(ctx, `Pilih metode pembayaran ya kak.\n\nTotal pembayaran: ${money(preview.total)}${preview.priceChanged ? '\nHarga menu terbaru sudah diterapkan pada total ini.' : ''}\n\nUntuk saat ini metode pembayaran yang tersedia adalah COD.`, new InlineKeyboard().text('COD', 'c:cod').row().text('Back', 'c:back'))
+  return editTemplate(ctx, 'payment_prompt', { total: money(preview.total), price_changed: preview.priceChanged ? '\nHarga menu terbaru sudah diterapkan pada total ini.' : '' }, new InlineKeyboard().text('COD', 'c:cod').row().text('Back', 'c:back'))
 }
 
 async function showOrderList(ctx: Context, user: TelegramCustomer, requestedPage: number, editing: boolean) {
   const limit = positive(await setting('my_orders_page_size', '5')) || 5
   const result = await listCustomerOrders(user.id, requestedPage, limit); const page = Math.min(requestedPage, result.pages)
-  if (!result.rows.length) return respond(ctx, editing, 'Kakak belum punya order di Deedims.\n\nKalau mau pesan, silakan kirim /order ya 😊')
-  const lines = ['Order kakak di Deedims 📦', '', 'Pilih salah satu order untuk lihat detailnya.', '']
+  if (!result.rows.length) return respondTemplate(ctx, editing, 'my_orders_empty')
+  const header = await renderTemplate('my_orders_list_header')
+  const lines = [header, '']
   result.rows.forEach((order, index) => lines.push(`${index + 1}. ${order.orderCode}\n   Status: ${statusLabel(order.orderStatus)}\n   Total: ${money(order.totalAmount)}\n   Dibuat: ${formatJakarta(order.createdAt)}`, ''))
   const keyboard = new InlineKeyboard()
   result.rows.forEach((order, index) => keyboard.text(`${index + 1}. ${order.orderCode}`, `mo:d:${order.id}:${page}`).row())
@@ -376,24 +378,36 @@ async function guarded(ctx: Context, action: (user: TelegramCustomer) => Promise
     await ensureCustomer(user)
     await action(user)
   } catch (error) {
-    const message = error instanceof BotBusinessError ? `Maaf kak, ${error.message}\n\nSilakan coba lagi dari command utama.` : 'Terjadi kendala saat memproses permintaan kak. Silakan coba lagi sebentar lagi ya.'
+    const message = error instanceof BotBusinessError ? await renderTemplate('business_error', { error_message: error.message }) : await renderTemplate('system_error')
     if (!(error instanceof BotBusinessError)) console.error(error)
     if (ctx.callbackQuery) await edit(ctx, message).catch(() => reply(ctx, message))
     else await reply(ctx, message)
   }
 }
 
+async function replyTemplate(ctx: Context, key: TemplateKey, values: Record<string, unknown> = {}, keyboard?: InlineKeyboard) {
+  return reply(ctx, await renderTemplate(key, values), keyboard)
+}
+
+async function editTemplate(ctx: Context, key: TemplateKey, values: Record<string, unknown> = {}, keyboard?: InlineKeyboard) {
+  return edit(ctx, await renderTemplate(key, values), keyboard)
+}
+
+async function respondTemplate(ctx: Context, editing: boolean, key: TemplateKey, values: Record<string, unknown> = {}, keyboard?: InlineKeyboard) {
+  return respond(ctx, editing, await renderTemplate(key, values), keyboard)
+}
+
 async function reply(ctx: Context, text: string, keyboard?: InlineKeyboard) {
   if (!ctx.chat) return
-  const sent = await sendTelegramMessage(BigInt(ctx.chat.id), text, { intent: 'bot_reply' }, keyboard ? { reply_markup: keyboard } : undefined)
+  const sent = await sendTelegramMessage(BigInt(ctx.chat.id), text, { intent: 'bot_reply' }, { parse_mode: 'HTML', ...(keyboard ? { reply_markup: keyboard } : {}) })
   if (sent && keyboard && ctx.from) await prisma.customer.updateMany({ where: { telegramUserId: BigInt(ctx.from.id) }, data: { activeOrderMessageId: BigInt(sent.message_id) } })
   return sent
 }
 
 async function edit(ctx: Context, text: string, keyboard?: InlineKeyboard) {
   const message = ctx.callbackQuery?.message
-  if (message && 'photo' in message) await ctx.editMessageCaption({ caption: text, ...(keyboard ? { reply_markup: keyboard } : {}) })
-  else await ctx.editMessageText(text, keyboard ? { reply_markup: keyboard } : undefined)
+  if (message && 'photo' in message) await ctx.editMessageCaption({ caption: text, parse_mode: 'HTML', ...(keyboard ? { reply_markup: keyboard } : {}) })
+  else await ctx.editMessageText(text, { parse_mode: 'HTML', ...(keyboard ? { reply_markup: keyboard } : {}) })
   if (!ctx.chat) return
   await logEditedResponse(ctx, text)
 }
@@ -406,7 +420,7 @@ async function editMenuPhoto(
 ) {
   const media = menu.telegramFileId || imageInput(menu.imageUrl!)
   try {
-    const result = await ctx.editMessageMedia({ type: 'photo', media, caption }, { reply_markup: keyboard })
+    const result = await ctx.editMessageMedia({ type: 'photo', media, caption, parse_mode: 'HTML' }, { reply_markup: keyboard })
     if (result !== true && result.photo?.length) {
       const fileId = result.photo[result.photo.length - 1].file_id
       if (fileId !== menu.telegramFileId) await prisma.menu.update({ where: { id: menu.id }, data: { telegramFileId: fileId } })
@@ -415,7 +429,7 @@ async function editMenuPhoto(
   } catch (error) {
     if (menu.telegramFileId && menu.imageUrl) {
       await prisma.menu.update({ where: { id: menu.id }, data: { telegramFileId: null } })
-      const result = await ctx.editMessageMedia({ type: 'photo', media: imageInput(menu.imageUrl), caption }, { reply_markup: keyboard })
+      const result = await ctx.editMessageMedia({ type: 'photo', media: imageInput(menu.imageUrl), caption, parse_mode: 'HTML' }, { reply_markup: keyboard })
       if (result !== true && result.photo?.length) await prisma.menu.update({ where: { id: menu.id }, data: { telegramFileId: result.photo[result.photo.length - 1].file_id } })
       await logEditedResponse(ctx, caption)
       return

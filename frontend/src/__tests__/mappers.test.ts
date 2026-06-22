@@ -87,7 +87,8 @@ describe('mapPreorderRow / mapCustomerRow / mapSubscriber / mapSetting / mapUser
       .toEqual({ id: 1, username: 'sari', name: 'Sari', messageCount: 3 })
   })
   it('setting: inputType textarea→true', () => {
-    expect(mapSetting({ id: 1, label: 'k', value: 'v', description: 'd', inputType: 'textarea' })).toEqual({ id: 1, label: 'k', desc: 'd', value: 'v', textarea: true })
+    expect(mapSetting({ id: 1, label: 'k', value: 'v', description: 'd', inputType: 'textarea', category: 'general', placeholders: [] }))
+      .toEqual({ id: 1, label: 'k', desc: 'd', value: 'v', textarea: true, inputType: 'textarea', category: 'general', placeholders: [] })
   })
   it('user: fullName→name, isSuper→super', () => {
     expect(mapUser({ id: 2, username: 'staff', fullName: 'Staff', isSuper: false })).toEqual({ id: 2, username: 'staff', name: 'Staff', password: '', super: false })
