@@ -66,6 +66,32 @@ describe('menus', () => {
     expect(m.addonLinks).toHaveLength(0)
   })
 
+  it('patch menu dengan variant di cart aktif tetap berhasil', async () => {
+    const variant = await prisma.menuVariant.findFirstOrThrow({ where: { menuId: 1 } })
+    await prisma.cartItem.create({
+      data: {
+        telegramUserId: 111n,
+        menuId: 1,
+        menuVariantId: variant.id,
+        menuNameSnapshot: 'Menu A',
+        variantNameSnapshot: 'Reg',
+        unitPrice: 10000,
+        quantity: 1,
+      },
+    })
+
+    const res = await app.inject({
+      method: 'PATCH', url: '/api/menus/1', headers: authH(token),
+      payload: { name: 'Menu A+', basePrice: 12000, unitLabel: 'pack', category: 'ready', variants: [{ name: 'Reg+', price: 12000, stockId: 1, qty: 2 }], addons: [2] },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(data(res)).toMatchObject({ name: 'Menu A+', basePrice: 12000, category: 'ready' })
+    const updated = await prisma.menuVariant.findUniqueOrThrow({ where: { id: variant.id }, include: { stockUsages: true } })
+    expect(updated).toMatchObject({ name: 'Reg+', price: 12000 })
+    expect(updated.stockUsages[0]).toMatchObject({ stockItemId: 1, quantity: 2 })
+  })
+
   it('patch bisa menyimpan menu yang sama sebagai free dan add-on berbayar', async () => {
     const res = await app.inject({
       method: 'PATCH', url: '/api/menus/1', headers: authH(token),

@@ -105,6 +105,40 @@ async function writeChildren(tx: Prisma.TransactionClient, menuId: number, data:
   }
 }
 
+async function replaceVariants(tx: Prisma.TransactionClient, menuId: number, variants: MenuInput['variants']) {
+  const existing = await tx.menuVariant.findMany({ where: { menuId }, orderBy: { id: 'asc' }, select: { id: true } })
+
+  for (const [index, variant] of variants.entries()) {
+    const current = existing[index]
+    if (current) {
+      await tx.menuVariant.update({
+        where: { id: current.id },
+        data: { name: variant.name ?? null, price: variant.price, imageUrl: variant.imageUrl ?? null },
+      })
+      await tx.menuVariantStockUsage.deleteMany({ where: { menuVariantId: current.id } })
+      if (variant.stockId != null) {
+        await tx.menuVariantStockUsage.create({ data: { menuVariantId: current.id, stockItemId: variant.stockId, quantity: variant.qty ?? 1 } })
+      }
+    } else {
+      await tx.menuVariant.create({
+        data: {
+          menuId,
+          name: variant.name ?? null,
+          price: variant.price,
+          imageUrl: variant.imageUrl ?? null,
+          stockUsages: variant.stockId != null ? { create: [{ stockItemId: variant.stockId, quantity: variant.qty ?? 1 }] } : undefined,
+        },
+      })
+    }
+  }
+
+  const surplus = existing.slice(variants.length)
+  if (surplus.length) {
+    await tx.menuVariantStockUsage.deleteMany({ where: { menuVariantId: { in: surplus.map((variant) => variant.id) } } })
+    await tx.menuVariant.deleteMany({ where: { id: { in: surplus.map((variant) => variant.id) } } })
+  }
+}
+
 export async function menusRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authenticate)
 
@@ -169,11 +203,16 @@ export async function menusRoutes(app: FastifyInstance) {
         data: { name: d.name, description: d.description ?? null, basePrice: d.basePrice, unitLabel: d.unitLabel ?? null, category: d.category ?? null, isActive: d.isActive, isAddon: d.isAddon, imageUrl: d.imageUrl ?? null, telegramFileId: nextFileId },
       })
 
-      const oldVariants = await tx.menuVariant.findMany({ where: { menuId: id }, select: { id: true } })
-      await tx.menuVariantStockUsage.deleteMany({ where: { menuVariantId: { in: oldVariants.map((v) => v.id) } } })
-      await tx.menuVariant.deleteMany({ where: { menuId: id } })
+      await replaceVariants(tx, id, d.variants)
       await tx.menuAddon.deleteMany({ where: { menuId: id } })
-      await writeChildren(tx, id, d)
+      if (!d.isAddon) {
+        for (const addonMenuId of Array.from(new Set(d.addons))) {
+          await tx.menuAddon.create({ data: { menuId: id, addonMenuId, isFree: false } })
+        }
+        for (const addonMenuId of Array.from(new Set(d.freeAddons))) {
+          await tx.menuAddon.create({ data: { menuId: id, addonMenuId, isFree: true } })
+        }
+      }
     })
 
     const menu = await prisma.menu.findUnique({ where: { id }, include: menuWithRelations })
