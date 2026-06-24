@@ -149,6 +149,21 @@ describe('menus', () => {
     act(() => r.current.saveMenu())
     await waitFor(() => expect(api.createMenu).toHaveBeenCalledWith(expect.objectContaining({ name: 'Baru', basePrice: 9000, isActive: true })))
     await waitFor(() => expect((r.current.lists.menus.rows as any[]).some((m) => m.id === 9)).toBe(true))
+    expect(r.current.editMenuId).toBeNull()
+    expect(r.current.menuDraft).toBeNull()
+  })
+
+  it('saveMenu edit → updateMenu body + tutup editor', async () => {
+    api.updateMenu.mockResolvedValue({ id: 1, name: 'Menu A+', description: '', basePrice: 12000, unitLabel: '', isActive: true, isAddon: false, imageUrl: '', variants: [{ name: 'Reg', price: 12000, stockId: 1, qty: 2, imageUrl: '' }], addons: [2], freeAddons: [] })
+    const r = await mountAuthed()
+    await goto(r, 'menus')
+    act(() => r.current.openMenuEditor(menuRow as any))
+    act(() => r.current.updateDraft({ name: 'Menu A+', basePrice: 12000 }))
+    act(() => r.current.saveMenu())
+    await waitFor(() => expect(api.updateMenu).toHaveBeenCalledWith(1, expect.objectContaining({ name: 'Menu A+', basePrice: 12000 })))
+    await waitFor(() => expect(r.current.editMenuId).toBeNull())
+    expect(r.current.menuDraft).toBeNull()
+    expect(r.current.toast).toBe('Menu diperbarui')
   })
 
   it('toggleFreeAddon bisa berdampingan dengan add-on berbayar', async () => {
