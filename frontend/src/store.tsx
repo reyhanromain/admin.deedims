@@ -781,18 +781,19 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         })()
       },
       saveMenu: () => {
-        const d = state.menuDraft
+        const current = stateRef.current
+        const d = current.menuDraft
         if (!d) return
         if (!d.name.trim()) { showToast('Nama menu wajib diisi'); return }
         const body = menuToApi(d)
         void (async () => {
           try {
-            if (state.editMenuId === 'new') {
+            if (current.editMenuId === 'new') {
               const m = await api.createMenu(body)
               update((s) => ({ lists: withRows(s, 'menus', (rows) => [mapMenu(m), ...rows]), editMenuId: null, menuDraft: null }))
               showToast('Menu baru dibuat')
             } else {
-              const id = state.editMenuId as number
+              const id = current.editMenuId as number
               const m = await api.updateMenu(id, body)
               update((s) => ({ lists: withRows(s, 'menus', (rows) => rows.map((x) => (x.id === id ? mapMenu(m) : x))), editMenuId: null, menuDraft: null }))
               showToast('Menu diperbarui')
