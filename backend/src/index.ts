@@ -28,6 +28,12 @@ async function main() {
           { command: 'remind_preorder', description: 'Aktifkan reminder pre-order' },
           { command: 'stop_preorder_reminder', description: 'Matikan reminder pre-order' },
         ])
+        // Menu Button persisten yang membuka mini app (kalau MINI_APP_URL di-set).
+        if (config.miniAppUrl) {
+          await bot.api.setChatMenuButton({
+            menu_button: { type: 'web_app', text: 'Buka Mini App', web_app: { url: config.miniAppUrl } },
+          }).catch((error) => app.log.warn(error, 'Gagal set menu button mini app'))
+        }
         app.log.info(`Bot @${info.username} aktif`)
       },
     }).catch((error) => app.log.error(error, 'Bot Telegram gagal dijalankan'))

@@ -24,6 +24,7 @@ export interface Menu {
   description: string
   basePrice: number
   unitLabel: string
+  category: string
   active: boolean
   isAddon: boolean
   image: string
@@ -217,6 +218,7 @@ export interface MenuDraft {
   description: string
   basePrice: number | string
   unitLabel: string
+  category: string
   active: boolean
   isAddon: boolean
   image: string

@@ -114,7 +114,7 @@ describe('mapDashboard', () => {
 })
 
 describe('menuToApi', () => {
-  const draft: MenuDraft = { name: 'X', description: 'desc', basePrice: '12000', unitLabel: 'pack', active: false, isAddon: false, image: '/uploads/x.png', variants: [{ name: 'Reg', price: 12000, stockId: 1, qty: 2, image: '/uploads/v.png' }], addons: [3, 4], freeAddons: [4] }
+  const draft: MenuDraft = { name: 'X', description: 'desc', basePrice: '12000', unitLabel: 'pack', category: 'ready', active: false, isAddon: false, image: '/uploads/x.png', variants: [{ name: 'Reg', price: 12000, stockId: 1, qty: 2, image: '/uploads/v.png' }], addons: [3, 4], freeAddons: [4] }
   it('active→isActive, image→imageUrl, basePrice parse', () => {
     expect(menuToApi(draft)).toMatchObject({ name: 'X', basePrice: 12000, unitLabel: 'pack', isActive: false, imageUrl: '/uploads/x.png', variants: [{ name: 'Reg', price: 12000, stockId: 1, qty: 2, imageUrl: '/uploads/v.png' }], addons: [3, 4], freeAddons: [4] })
   })

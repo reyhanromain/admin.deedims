@@ -343,6 +343,181 @@ export async function checkout(customer: TelegramCustomer) {
   })
 }
 
+export type SubmitOrderItem = {
+  variantId: number
+  quantity: number
+  addonVariantIds?: number[]
+}
+
+export type SubmitOrderMeta = {
+  name?: string
+  phone?: string
+  method?: string
+  note?: string
+}
+
+/** Versi tx-aware dari free add-on otomatis (tepat 1 varian aktif per menu pelengkap gratis). */
+async function freeAddonVariantsTx(tx: Prisma.TransactionClient, menuId: number) {
+  const links = await tx.menuAddon.findMany({
+    where: { menuId, isFree: true, isActive: true },
+    include: { addonMenu: { include: { variants: { where: { isActive: true }, include: variantInclude, orderBy: { id: 'asc' } } } } },
+    orderBy: { sortOrder: 'asc' },
+  })
+  const variants: Array<Prisma.MenuVariantGetPayload<{ include: typeof variantInclude }>> = []
+  const seen = new Set<number>()
+  for (const link of links) {
+    if (seen.has(link.addonMenuId)) continue
+    seen.add(link.addonMenuId)
+    if (!link.addonMenu.isActive || link.addonMenu.variants.length !== 1) {
+      throw new BotBusinessError('FREE_ADDON_INVALID', `Pelengkap gratis ${link.addonMenu.name} harus memiliki tepat satu varian aktif.`)
+    }
+    variants.push(link.addonMenu.variants[0])
+  }
+  return variants
+}
+
+/**
+ * Buat order langsung dari daftar item (mini app menyimpan cart di sisi klien).
+ * Mirip {@link checkout} tapi sumbernya payload, bukan tabel CartItem: harga
+ * dihitung ulang dari DB (tidak mempercayai klien), free add-on dilampirkan
+ * otomatis, stok divalidasi & dipotong atomik dalam satu transaksi.
+ */
+export async function submitOrder(customer: TelegramCustomer, items: SubmitOrderItem[], meta: SubmitOrderMeta = {}) {
+  await ensureCustomer(customer)
+  if (!items.length) throw new BotBusinessError('CART_EMPTY', 'Keranjang masih kosong.')
+  for (const item of items) {
+    if (!Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 99) {
+      throw new BotBusinessError('INVALID_QUANTITY', 'Quantity tidak valid.')
+    }
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const preOrder = await tx.preOrder.findFirst({ where: { status: 'open' }, orderBy: { openedAt: 'desc' } })
+    if (!preOrder) throw new BotBusinessError('PREORDER_CLOSED', 'Pre-order sudah tidak dibuka.')
+
+    type ResolvedVariant = Prisma.MenuVariantGetPayload<{ include: typeof variantInclude }>
+    type ResolvedItem = { main: ResolvedVariant; quantity: number; addons: Array<{ variant: ResolvedVariant; isFree: boolean }> }
+
+    const resolved: ResolvedItem[] = []
+    const stockNeeded = new Map<number, number>()
+    const requireStock = (variant: ResolvedVariant, quantity: number) => {
+      for (const usage of variant.stockUsages) {
+        if (!usage.stockItem.isActive) throw new BotBusinessError('STOCK_INSUFFICIENT', 'Stock untuk isi keranjang tidak mencukupi.')
+        stockNeeded.set(usage.stockItemId, (stockNeeded.get(usage.stockItemId) ?? 0) + usage.quantity * quantity)
+      }
+    }
+
+    for (const item of items) {
+      const main = await tx.menuVariant.findUnique({ where: { id: item.variantId }, include: variantInclude })
+      if (!main?.isActive || !main.menu.isActive || main.menu.isAddon) {
+        throw new BotBusinessError('MENU_INVALID', 'Menu sudah tidak tersedia.')
+      }
+      const addons: ResolvedItem['addons'] = []
+      const seenAddonMenus = new Set<number>()
+      for (const addonVariantId of Array.from(new Set(item.addonVariantIds ?? []))) {
+        const addon = await tx.menuVariant.findUnique({ where: { id: addonVariantId }, include: variantInclude })
+        if (!addon?.isActive || !addon.menu.isActive || !addon.menu.isAddon) {
+          throw new BotBusinessError('ADDON_INVALID', 'Add-on sudah tidak tersedia.')
+        }
+        const link = await tx.menuAddon.findFirst({ where: { menuId: main.menuId, addonMenuId: addon.menuId, isActive: true, isFree: false } })
+        if (!link) throw new BotBusinessError('ADDON_INVALID', 'Add-on tidak berlaku untuk menu ini.')
+        if (seenAddonMenus.has(addon.menuId)) continue
+        seenAddonMenus.add(addon.menuId)
+        addons.push({ variant: addon, isFree: false })
+      }
+      for (const free of await freeAddonVariantsTx(tx, main.menuId)) addons.push({ variant: free, isFree: true })
+
+      requireStock(main, item.quantity)
+      for (const addon of addons) requireStock(addon.variant, item.quantity)
+      resolved.push({ main, quantity: item.quantity, addons })
+    }
+
+    for (const [stockItemId, quantity] of stockNeeded) {
+      const result = await tx.stockItem.updateMany({ where: { id: stockItemId, quantity: { gte: quantity } }, data: { quantity: { decrement: quantity } } })
+      if (result.count !== 1) throw new BotBusinessError('STOCK_INSUFFICIENT', 'Stock berubah dan tidak lagi mencukupi.')
+    }
+
+    const total = resolved.reduce((sum, item) => {
+      const addonsUnit = item.addons.reduce((value, addon) => value + (addon.isFree ? 0 : addon.variant.price), 0)
+      return sum + (item.main.price + addonsUnit) * item.quantity
+    }, 0)
+
+    const order = await tx.order.create({
+      data: {
+        orderCode: orderCode(customer.id),
+        preOrderId: preOrder.id,
+        telegramUserId: customer.id,
+        telegramUsername: customer.username ?? null,
+        customerName: meta.name?.trim() || customer.name || null,
+        paymentMethod: 'cod',
+        paymentStatus: 'pending',
+        orderStatus: 'submitted',
+        subtotalAmount: total,
+        totalAmount: total,
+        notes: composeOrderNotes(meta),
+        submittedAt: new Date(),
+      },
+    })
+
+    let sortOrder = 0
+    for (const item of resolved) {
+      const main = await tx.orderItem.create({
+        data: {
+          orderId: order.id,
+          menuId: item.main.menuId,
+          menuVariantId: item.main.id,
+          menuNameSnapshot: item.main.menu.name,
+          variantNameSnapshot: visibleVariantName(item.main.name),
+          unitPrice: item.main.price,
+          quantity: item.quantity,
+          lineTotal: item.main.price * item.quantity,
+          sortOrder: sortOrder++,
+        },
+      })
+      if (item.main.stockUsages.length) {
+        await tx.orderItemStockUsage.createMany({
+          data: item.main.stockUsages.map((usage) => ({ orderItemId: main.id, stockItemId: usage.stockItemId, quantity: usage.quantity * item.quantity })),
+        })
+      }
+      for (const addon of item.addons) {
+        const unitPrice = addon.isFree ? 0 : addon.variant.price
+        const created = await tx.orderItem.create({
+          data: {
+            orderId: order.id,
+            parentOrderItemId: main.id,
+            menuId: addon.variant.menuId,
+            menuVariantId: addon.variant.id,
+            menuNameSnapshot: addon.variant.menu.name,
+            variantNameSnapshot: visibleVariantName(addon.variant.name),
+            unitPrice,
+            quantity: item.quantity,
+            lineTotal: unitPrice * item.quantity,
+            sortOrder: sortOrder++,
+          },
+        })
+        if (addon.variant.stockUsages.length) {
+          await tx.orderItemStockUsage.createMany({
+            data: addon.variant.stockUsages.map((usage) => ({ orderItemId: created.id, stockItemId: usage.stockItemId, quantity: usage.quantity * item.quantity })),
+          })
+        }
+      }
+    }
+
+    // Bersihkan cart bot (kalau ada) agar konsisten dengan checkout via bot.
+    await tx.cartItem.deleteMany({ where: { telegramUserId: customer.id } })
+    return order
+  })
+}
+
+/** Susun catatan order dari data checkout mini app (no. WA, metode ambil, catatan). */
+function composeOrderNotes(meta: SubmitOrderMeta) {
+  const lines: string[] = []
+  if (meta.phone?.trim()) lines.push(`WA: ${meta.phone.trim()}`)
+  if (meta.method) lines.push(`Metode: ${meta.method === 'pickup' ? 'Pickup' : 'COD'}`)
+  if (meta.note?.trim()) lines.push(meta.note.trim())
+  return lines.length ? lines.join('\n') : null
+}
+
 export async function checkoutPreview(telegramUserId: bigint) {
   return prisma.$transaction(async (tx) => {
     const preOrder = await tx.preOrder.findFirst({ where: { status: 'open' } })
