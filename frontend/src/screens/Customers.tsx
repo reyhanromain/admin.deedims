@@ -184,7 +184,7 @@ function CustomerDetail({ customer }: { customer: CustomerRow }) {
               {orders.map((o) => (
                 <Hoverable
                   key={o.id}
-                  onClick={() => s.set({ screen: 'orders', selectedOrderId: o.id, selectedCustomerU: null })}
+                  onClick={() => s.selectOrder(o.id)}
                   style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', border: `1px solid ${t.rowBorder}`, borderRadius: 12, cursor: 'pointer', flexWrap: 'wrap' }}
                   hover={{ filter: 'brightness(0.98)' }}
                 >

@@ -8,6 +8,8 @@ export function ImageSlot({ src, label, radius = 0, style }: { src: string; labe
       <img
         src={src}
         alt={label ?? ''}
+        loading="lazy"
+        decoding="async"
         style={base}
         onError={(e) => {
           ;(e.currentTarget as HTMLImageElement).style.visibility = 'hidden'
