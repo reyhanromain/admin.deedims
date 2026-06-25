@@ -34,6 +34,7 @@ import type {
   User,
   UserDraft,
 } from './types'
+import { currentAdminScreen, pathToScreen, pushAdminScreen, replaceAdminScreen, replaceInvalidAdminPath } from './adminRoutes'
 
 export type EditMenuId = number | 'new' | null
 export type ListKey = 'orders' | 'customers' | 'subscribers' | 'botMessages' | 'preorders' | 'menus' | 'stock' | 'users' | 'settings'
@@ -264,7 +265,7 @@ export interface AdminStore extends State {
 const AdminContext = createContext<AdminStore | null>(null)
 
 export function AdminProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<State>(initialState)
+  const [state, setState] = useState<State>(() => ({ ...initialState, screen: currentAdminScreen() }))
   const stateRef = useRef(state)
   stateRef.current = state
   const toastTimer = useRef<ReturnType<typeof setTimeout>>()
@@ -275,6 +276,12 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
   const set = useCallback((patch: Partial<State>) => setState((s) => ({ ...s, ...patch })), [])
   const update = useCallback((fn: (s: State) => Partial<State>) => setState((s) => ({ ...s, ...fn(s) })), [])
+
+  const navigateScreen = useCallback((screen: Screen, mode: 'push' | 'replace' | 'silent' = 'push') => {
+    if (mode === 'push') pushAdminScreen(screen)
+    if (mode === 'replace') replaceAdminScreen(screen)
+    setState((s) => ({ ...s, screen, selectedOrderId: null, selectedCustomerU: null, selectedPreorderId: null }))
+  }, [])
 
   const showToast = useCallback((msg: string) => {
     clearTimeout(toastTimer.current)
@@ -444,6 +451,18 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       setState((s) => ({ ...s, authed: false, booting: false }))
     }
   }, [])
+
+  useEffect(() => { replaceInvalidAdminPath() }, [])
+
+  useEffect(() => {
+    const onPopState = () => {
+      const screen = pathToScreen(window.location.pathname) ?? 'dashboard'
+      navigateScreen(screen, 'silent')
+      if (!pathToScreen(window.location.pathname)) replaceAdminScreen(screen)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [navigateScreen])
 
   useEffect(() => { if (getToken()) void validateSession() }, [validateSession])
 
@@ -646,7 +665,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
           try {
             const { token, user } = await api.login(un, state.loginPass)
             setToken(token)
-            setState((s) => ({ ...s, authed: true, booting: false, loginPass: '', currentUser: { username: user.username, name: user.fullName, super: user.isSuper }, screen: 'dashboard', selectedOrderId: null, selectedCustomerU: null }))
+            setState((s) => ({ ...s, authed: true, booting: false, loginPass: '', currentUser: { username: user.username, name: user.fullName, super: user.isSuper }, screen: currentAdminScreen(), selectedOrderId: null, selectedCustomerU: null }))
             showToast('Selamat datang, ' + user.fullName.split(' ')[0])
           } catch (e) {
             showToast(e instanceof ApiError ? e.message : 'Login gagal')
@@ -658,11 +677,15 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         listLoaded.current.clear()
         inflight.current.clear()
         dashLoaded.current = false
-        setState((s) => ({ ...s, ...initialState, booting: false, dark: s.dark }))
+        replaceAdminScreen('dashboard')
+        setState((s) => ({ ...s, ...initialState, booting: false, dark: s.dark, screen: 'dashboard' }))
       },
 
-      goScreen: (screen) => set({ screen, selectedOrderId: null, selectedCustomerU: null, selectedPreorderId: null }),
-      selectOrder: (id) => set({ screen: 'orders', selectedOrderId: id, selectedCustomerU: null }),
+      goScreen: (screen) => navigateScreen(screen),
+      selectOrder: (id) => {
+        pushAdminScreen('orders')
+        set({ screen: 'orders', selectedOrderId: id, selectedCustomerU: null })
+      },
       selectPreorder: (id) => set({ selectedPreorderId: id }),
       setPreorderOrdersPage: (page) => { if (state.selectedPreorderId != null) loadPreorderOrders(state.selectedPreorderId, page) },
 
