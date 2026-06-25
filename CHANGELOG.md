@@ -4,6 +4,18 @@ All notable product changes for Deedims are tracked here.
 
 This project follows [Semantic Versioning](https://semver.org/) for the deployable product version and [Conventional Commits](https://www.conventionalcommits.org/) for commit messages.
 
+## [2.4.0] - 2026-06-25
+
+### Added
+
+- Generate WebP image variants for menu image uploads while preserving the original image URL for bot and fallback behavior.
+- Use optimized image variants in CMS previews, menu thumbnails, lightbox views, and Telegram Mini App catalog/detail/cart screens.
+- Generate optimized image variants for starter seed upload assets during reset/reseed flows.
+
+### Changed
+
+- Expose optional `imageVariants` fields in menu APIs so existing images safely fall back to originals until variants exist.
+
 ## [2.3.0] - 2026-06-22
 
 ### Added
