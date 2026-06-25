@@ -142,7 +142,8 @@ export const mapStock = (r: any): StockItem => ({ id: r.id, label: r.label, name
 export const mapMenu = (r: any): Menu => ({
   id: r.id, name: r.name, description: r.description ?? '', basePrice: r.basePrice, unitLabel: r.unitLabel ?? '', category: r.category ?? '', active: r.isActive, isAddon: r.isAddon,
   image: r.imageUrl ?? '',
-  variants: (r.variants ?? []).map((v: any) => ({ name: v.name ?? '', price: v.price, stockId: v.stockId ?? 0, qty: v.qty ?? 1, image: v.imageUrl ?? '' })),
+  imageVariants: r.imageVariants ?? null,
+  variants: (r.variants ?? []).map((v: any) => ({ name: v.name ?? '', price: v.price, stockId: v.stockId ?? 0, qty: v.qty ?? 1, image: v.imageUrl ?? '', imageVariants: v.imageVariants ?? null })),
   addons: r.addons ?? [],
   freeAddons: r.freeAddons ?? [],
 })

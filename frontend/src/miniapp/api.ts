@@ -52,6 +52,7 @@ const mapMenu = (r: any): Menu => ({
   description: r.description ?? '',
   category: r.category ?? null,
   image: r.imageUrl ?? '',
+  imageVariants: r.imageVariants ?? null,
   variants: (r.variants ?? []).map((v: any) => ({ id: v.id, name: v.name ?? null, price: v.price })),
   addons: (r.addons ?? []).map((a: any) => ({ menuId: a.menuId, variantId: a.variantId, name: a.name, price: a.price })),
   freeAddons: (r.freeAddons ?? []).map((f: any) => ({ menuId: f.menuId, name: f.name })),

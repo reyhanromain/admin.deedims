@@ -6,6 +6,7 @@ import { HoverButton, Icon } from '../ui'
 import { Pager } from '../components/Pager'
 import type { Menu, Variant } from '../types'
 import { useIsMobile } from '../responsive'
+import { imageFor } from '../imageVariants'
 
 export function Menus() {
   const s = useAdmin()
@@ -57,7 +58,7 @@ function MenuCard({ menu: m, usageOf }: { menu: Menu; usageOf: (v: Variant) => s
     <div style={cardStyle(t, { overflow: 'hidden' })}>
       <div style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', gap: isMobile ? 12 : 14, padding: isMobile ? 14 : '16px 20px', flexWrap: 'wrap' }}>
         <button
-          onClick={() => s.openImage(m.image)}
+          onClick={() => s.openImage(imageFor(m.image, m.imageVariants, 'large'))}
           title={m.image ? 'Lihat foto' : 'Belum ada foto'}
           style={{
             width: 48, height: 48, flexShrink: 0, border: `1px solid ${t.rowBorder}`, borderRadius: 12,
@@ -66,7 +67,7 @@ function MenuCard({ menu: m, usageOf }: { menu: Menu; usageOf: (v: Variant) => s
           }}
         >
           {m.image ? (
-            <img src={m.image} alt={m.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            <img src={imageFor(m.image, m.imageVariants, 'thumb')} alt={m.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
           ) : (
             <Icon size={20} stroke={t.chipColor} strokeWidth={1.7} path="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z M8.5 7a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z M21 15l-5-5L5 21" />
           )}

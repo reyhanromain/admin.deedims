@@ -16,6 +16,7 @@ export interface Variant {
   stockId: number
   qty: number
   image: string
+  imageVariants?: Partial<Record<'thumb' | 'card' | 'detail' | 'large', string>> | null
 }
 
 export interface Menu {
@@ -28,6 +29,7 @@ export interface Menu {
   active: boolean
   isAddon: boolean
   image: string
+  imageVariants?: Partial<Record<'thumb' | 'card' | 'detail' | 'large', string>> | null
   variants: Variant[]
   /** ids of add-on menus attached to this menu */
   addons: number[]
@@ -222,6 +224,7 @@ export interface MenuDraft {
   active: boolean
   isAddon: boolean
   image: string
+  imageVariants?: Partial<Record<'thumb' | 'card' | 'detail' | 'large', string>> | null
   variants: Variant[]
   addons: number[]
   freeAddons: number[]
