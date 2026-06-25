@@ -319,7 +319,7 @@ async function showCart(ctx: Context, user: TelegramCustomer, editing: boolean) 
   })
   const keyboard = new InlineKeyboard()
   if (cart.stockSufficient) keyboard.text('Check out', 'c:checkout').row()
-  else keyboard.text('Edit Cart', 'c:edit:1').row()
+  keyboard.text('Edit Cart', 'c:edit:1').row()
   keyboard.text('Empty cart', 'c:empty')
   return respond(ctx, editing, text, keyboard)
 }
