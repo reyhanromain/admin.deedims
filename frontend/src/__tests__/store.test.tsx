@@ -42,6 +42,7 @@ const dashboard = { kpis: { newOrders: 0, batchOrders: 1, batchRevenue: 10000, c
 
 beforeEach(() => {
   vi.clearAllMocks()
+  window.history.replaceState(null, '', '/')
   getTokenMock.mockReturnValue('tok')
   api.me.mockResolvedValue({ id: 1, username: 'admin', fullName: 'Dee Rahma', isSuper: true })
   api.dashboard.mockResolvedValue(dashboard)
@@ -86,9 +87,18 @@ describe('session gate (lazy)', () => {
 })
 
 describe('lazy per-layar', () => {
+  it('mount dari /orders → screen orders dan lazy-load orders', async () => {
+    window.history.replaceState(null, '', '/orders')
+    const r = await mountAuthed()
+    await waitFor(() => expect(r.current.isScreenReady()).toBe(true))
+    expect(r.current.screen).toBe('orders')
+    expect(api.ordersList).toHaveBeenCalledTimes(1)
+  })
+
   it('buka Orders → ordersList dipanggil, list lain tidak', async () => {
     const r = await mountAuthed()
     await goto(r, 'orders')
+    expect(window.location.pathname).toBe('/orders')
     expect(api.ordersList).toHaveBeenCalledTimes(1)
     expect(api.customersList).not.toHaveBeenCalled()
     expect(r.current.lists.orders.rows).toHaveLength(1)
@@ -108,6 +118,25 @@ describe('lazy per-layar', () => {
     await goto(r, 'orders')
     act(() => r.current.setListPage('orders', 2))
     await waitFor(() => expect(api.ordersList).toHaveBeenCalledWith(expect.objectContaining({ page: 2 })))
+  })
+
+  it('browser back/forward popstate mengubah screen dari URL', async () => {
+    const r = await mountAuthed()
+    await goto(r, 'menus')
+    expect(window.location.pathname).toBe('/menus')
+    act(() => {
+      window.history.pushState(null, '', '/orders')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+    await waitFor(() => expect(r.current.screen).toBe('orders'))
+  })
+
+  it('invalid path fallback ke dashboard dengan replaceState', async () => {
+    window.history.replaceState(null, '', '/unknown')
+    const r = await mountAuthed()
+    await waitFor(() => expect(r.current.isScreenReady()).toBe(true))
+    expect(r.current.screen).toBe('dashboard')
+    expect(window.location.pathname).toBe('/dashboard')
   })
 
   it('buka Bot Messages → load pesan + customer yang punya chat untuk filter', async () => {

@@ -42,7 +42,7 @@ export function Dashboard() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Order masuk terbaru</h2>
             <button
-              onClick={() => s.set({ screen: 'orders', orderFilter: 'all', selectedOrderId: null })}
+              onClick={() => { s.set({ orderFilter: 'all', selectedOrderId: null }); s.goScreen('orders') }}
               style={{ border: 'none', background: 'none', color: BRAND.terracotta, fontSize: 12.5, fontWeight: 700, padding: 4 }}
             >
               Lihat semua →
@@ -110,7 +110,7 @@ export function Dashboard() {
               {openPo ? 'Pekan fulfillment ' + openPo.fulfillmentWeek + ' · ' + openPo.note : 'Buka batch pre-order agar customer bisa mulai order.'}
             </div>
             <HoverButton
-              onClick={() => s.set({ screen: 'preorders' })}
+              onClick={() => s.goScreen('preorders')}
               style={{ border: 'none', background: 'rgba(255,255,255,0.14)', color: '#fff', fontSize: 12.5, fontWeight: 700, borderRadius: 10, padding: '9px 16px' }}
               hover={{ background: 'rgba(255,255,255,0.24)' }}
             >
@@ -133,7 +133,7 @@ export function Dashboard() {
               <div style={{ fontSize: 13, color: t.muted }}>Semua stock aman.</div>
             )}
             <button
-              onClick={() => s.set({ screen: 'stock' })}
+              onClick={() => s.goScreen('stock')}
               style={{ marginTop: 12, border: 'none', background: 'none', color: BRAND.terracotta, fontSize: 12.5, fontWeight: 700, padding: 0 }}
             >
               Kelola stock →
