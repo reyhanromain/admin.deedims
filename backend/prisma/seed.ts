@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import { copyFileSync, mkdirSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { generateImageVariants } from '../src/lib/imageVariants'
 
 const prisma = new PrismaClient()
 const seedDir = path.dirname(fileURLToPath(import.meta.url))
@@ -254,10 +255,13 @@ async function seedCatalog() {
   }
 }
 
-function seedUploadAssets() {
+async function seedUploadAssets() {
   mkdirSync(uploadsDir, { recursive: true })
   for (const filename of readdirSync(seedUploadsDir)) {
-    copyFileSync(path.join(seedUploadsDir, filename), path.join(uploadsDir, filename))
+    const source = path.join(seedUploadsDir, filename)
+    const destination = path.join(uploadsDir, filename)
+    copyFileSync(source, destination)
+    await generateImageVariants(destination, filename, uploadsDir, console.warn)
   }
 }
 
@@ -266,7 +270,7 @@ async function main() {
   await seedUsers()
   await seedSettings()
   await seedCatalog()
-  seedUploadAssets()
+  await seedUploadAssets()
 
   console.log(`Starter seed selesai. Login CMS: ${adminUsername} / ${adminPassword}`)
   console.log(`User staff: dita / ${staffPassword}`)
