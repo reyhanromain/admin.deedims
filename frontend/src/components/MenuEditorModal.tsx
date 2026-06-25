@@ -54,7 +54,7 @@ export function MenuEditorModal() {
               <label style={{ alignSelf: 'flex-start', fontSize: 12, fontWeight: 700, color: t.muted }}>Foto menu</label>
               <div style={{ width: isMobile ? '100%' : 96, height: isMobile ? 150 : 96, borderRadius: 8, overflow: 'hidden', background: t.surfaceAlt, border: `1px solid ${t.inputBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {d.image ? (
-                  <img src={imageFor(d.image, d.imageVariants, 'card')} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                  <img src={imageFor(d.image, d.imageVariants, 'card')} alt="preview" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                 ) : (
                   <Icon size={26} stroke={t.faint} strokeWidth={1.6} path="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z M8.5 7a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z M21 15l-5-5L5 21" />
                 )}
@@ -139,7 +139,7 @@ export function MenuEditorModal() {
                     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                       <div style={{ width: 72, height: 72, flexShrink: 0, borderRadius: 10, overflow: 'hidden', border: `1px solid ${t.inputBorder}`, background: t.surface, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {v.image ? (
-                          <img src={imageFor(v.image, v.imageVariants, 'thumb')} alt="preview variant" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                          <img src={imageFor(v.image, v.imageVariants, 'thumb')} alt="preview variant" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                         ) : (
                           <Icon size={20} stroke={t.faint} strokeWidth={1.6} path="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z M8.5 7a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z M21 15l-5-5L5 21" />
                         )}

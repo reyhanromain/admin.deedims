@@ -67,7 +67,7 @@ function MenuCard({ menu: m, usageOf }: { menu: Menu; usageOf: (v: Variant) => s
           }}
         >
           {m.image ? (
-            <img src={imageFor(m.image, m.imageVariants, 'thumb')} alt={m.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            <img src={imageFor(m.image, m.imageVariants, 'thumb')} alt={m.name} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
           ) : (
             <Icon size={20} stroke={t.chipColor} strokeWidth={1.7} path="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z M8.5 7a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z M21 15l-5-5L5 21" />
           )}
