@@ -1,7 +1,13 @@
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import { copyFileSync, mkdirSync, readdirSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const prisma = new PrismaClient()
+const seedDir = path.dirname(fileURLToPath(import.meta.url))
+const seedUploadsDir = path.join(seedDir, 'seed-assets', 'uploads')
+const uploadsDir = path.resolve(process.env.UPLOADS_DIR ?? './uploads')
 
 const adminUsername = process.env.SEED_ADMIN_USERNAME ?? 'admin'
 const adminName = process.env.SEED_ADMIN_NAME ?? 'Deedims Admin'
@@ -14,8 +20,8 @@ const starterUsers = [
 ]
 
 const starterStock = [
-  { label: 'dimsum', name: 'Dimsum', quantity: 0, unit: 'pcs', isActive: true },
-  { label: 'chili-oil', name: 'Chili Oil', quantity: 0, unit: 'cup', isActive: true },
+  { label: 'dimsum', name: 'Dimsum', quantity: 36, unit: 'pcs', isActive: true },
+  { label: 'chili-oil', name: 'Chili Oil', quantity: 7, unit: 'cup', isActive: true },
 ]
 
 type StarterMenu = {
@@ -23,6 +29,7 @@ type StarterMenu = {
   name: string
   description: string
   basePrice: number
+  unitLabel: string | null
   isActive: boolean
   imageUrl: string | null
   isAddon: boolean
@@ -30,6 +37,7 @@ type StarterMenu = {
   variants: Array<{
     name: string
     price: number
+    imageUrl?: string | null
     stock: Array<{ label: string; quantity: number }>
   }>
   addons: string[]
@@ -42,15 +50,16 @@ const starterMenus: StarterMenu[] = [
     name: 'Dimsum Mentai',
     description: 'Dimsum full ayam yang dibalut dengan saus mentai, kemudian dibakar yang membuat rasanya semakin gurih, lembut, dan smooky. Makin enak disajikan dengan hangat.',
     basePrice: 25000,
-    isActive: false,
-    imageUrl: '/uploads/ebdb321d-de8c-4e46-9b91-b80677003cd6.png',
+    unitLabel: 'pack',
+    isActive: true,
+    imageUrl: '/uploads/6aa98539-8abe-420b-be7c-211997fe0c08.png',
     isAddon: false,
     category: 'ready',
     variants: [
-      { name: 'Ngemil (4 pcs)', price: 25000, stock: [{ label: 'dimsum', quantity: 4 }] },
-      { name: 'Kenyang (6 pcs)', price: 35000, stock: [{ label: 'dimsum', quantity: 6 }] },
-      { name: 'Mini Party (12 pcs)', price: 70000, stock: [{ label: 'dimsum', quantity: 12 }] },
-      { name: 'Full Party (16 pcs)', price: 85000, stock: [{ label: 'dimsum', quantity: 16 }] },
+      { name: 'Ngemil (4 pcs)', price: 25000, imageUrl: '/uploads/9029c26b-85d9-4b34-86ea-8aca53c098c8.png', stock: [{ label: 'dimsum', quantity: 4 }] },
+      { name: 'Kenyang (6 pcs)', price: 35000, imageUrl: '/uploads/9229f864-0e22-456b-8500-9d15e44009e5.png', stock: [{ label: 'dimsum', quantity: 6 }] },
+      { name: 'Mini Party (12 pcs)', price: 70000, imageUrl: '/uploads/32eeb602-6eaf-4a79-84e2-a35878107960.png', stock: [{ label: 'dimsum', quantity: 12 }] },
+      { name: 'Full Party (16 pcs)', price: 85000, imageUrl: '/uploads/2b700c38-5adc-4e0f-810c-78f3b710e823.png', stock: [{ label: 'dimsum', quantity: 16 }] },
     ],
     addons: ['chili-oil'],
     freeAddons: ['chili-oil'],
@@ -60,41 +69,45 @@ const starterMenus: StarterMenu[] = [
     name: 'Dimsum Original',
     description: 'Dimsum full ayam disajikan dengan cara dikukus membuat rasanya semakin gurih dan lembut. Ditemani saus cocol yang asam manis',
     basePrice: 30000,
-    isActive: false,
+    unitLabel: 'pack',
+    isActive: true,
     imageUrl: '/uploads/4653c28f-ca25-4d1c-b2e0-9b50d796ef10.png',
     isAddon: false,
     category: 'ready',
     variants: [
-      { name: 'Kenyang (6 pcs)', price: 30000, stock: [{ label: 'dimsum', quantity: 6 }] },
-      { name: 'Mini Party (12 pcs)', price: 55000, stock: [{ label: 'dimsum', quantity: 12 }] },
-      { name: 'Full Party (16 pcs)', price: 73000, stock: [{ label: 'dimsum', quantity: 16 }] },
+      { name: 'Kenyang (6 pcs)', price: 30000, imageUrl: '/uploads/63a7ca56-521e-48fd-8035-6aee007ae5db.png', stock: [{ label: 'dimsum', quantity: 6 }] },
+      { name: 'Mini Party (12 pcs)', price: 55000, imageUrl: '/uploads/d5e34767-6735-43d2-8271-35d106972891.png', stock: [{ label: 'dimsum', quantity: 12 }] },
+      { name: 'Full Party (16 pcs)', price: 73000, imageUrl: '/uploads/91c36e52-945a-4696-b047-2a4679fb42e0.png', stock: [{ label: 'dimsum', quantity: 16 }] },
     ],
     addons: ['chili-oil'],
-    freeAddons: [],
+    freeAddons: ['chili-oil'],
   },
   {
     key: 'dimsum-ori-x-mentai',
     name: 'Dimsum Ori X Mentai',
     description: 'Pengen coba dimsum mentai dan original? ini menu yang tepat buat kamu! win win solution.',
     basePrice: 85000,
-    isActive: false,
-    imageUrl: null,
+    unitLabel: 'pack',
+    isActive: true,
+    imageUrl: '/uploads/a5dc4820-2d71-4b92-84f3-9ef0174403a1.png',
     isAddon: false,
-    category: 'frozen',
+    category: 'ready',
     variants: [
-      { name: '(default)', price: 85000, stock: [{ label: 'dimsum', quantity: 16 }] },
+      { name: 'Full Party (8 pcs Ori, 8 pcs Mentai)', price: 85000, stock: [{ label: 'dimsum', quantity: 16 }] },
     ],
     addons: ['chili-oil'],
-    freeAddons: [],
+    freeAddons: ['chili-oil'],
   },
   {
     key: 'chili-oil',
     name: 'Chili Oil',
     description: 'Pedas gurih dengan aroma khas rempah, sempurna untuk menambah cita rasa dimsum.',
     basePrice: 5000,
-    isActive: false,
+    unitLabel: 'cup',
+    isActive: true,
     imageUrl: '/uploads/0127ca13-6f42-4c6c-8477-3bbcfaa9dc55.png',
     isAddon: true,
+    category: 'ready',
     variants: [
       { name: '(default)', price: 5000, stock: [{ label: 'chili-oil', quantity: 1 }] },
     ],
@@ -189,6 +202,7 @@ async function seedCatalog() {
         name: menu.name,
         description: menu.description,
         basePrice: menu.basePrice,
+        unitLabel: menu.unitLabel,
         isActive: menu.isActive,
         imageUrl: menu.imageUrl,
         isAddon: menu.isAddon,
@@ -197,6 +211,7 @@ async function seedCatalog() {
           create: menu.variants.map((variant) => ({
             name: variant.name,
             price: variant.price,
+            imageUrl: variant.imageUrl ?? null,
             stockUsages: {
               create: variant.stock.map((usage) => ({
                 stockItemId: stockByLabel.get(usage.label)!,
@@ -239,11 +254,19 @@ async function seedCatalog() {
   }
 }
 
+function seedUploadAssets() {
+  mkdirSync(uploadsDir, { recursive: true })
+  for (const filename of readdirSync(seedUploadsDir)) {
+    copyFileSync(path.join(seedUploadsDir, filename), path.join(uploadsDir, filename))
+  }
+}
+
 async function main() {
   await clearOperationalData()
   await seedUsers()
   await seedSettings()
   await seedCatalog()
+  seedUploadAssets()
 
   console.log(`Starter seed selesai. Login CMS: ${adminUsername} / ${adminPassword}`)
   console.log(`User staff: dita / ${staffPassword}`)
