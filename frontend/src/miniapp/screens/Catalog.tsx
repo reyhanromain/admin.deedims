@@ -2,6 +2,7 @@ import { useMini } from '../store'
 import { priceLabel, tagOf } from '../helpers'
 import { ImageSlot, Icon, PATH } from '../ui'
 import type { Menu } from '../types'
+import { imageFor } from '../../imageVariants'
 
 const CHIPS = [
   { key: 'all', label: 'Semua' },
@@ -75,7 +76,7 @@ function GalleryCard({ menu, onOpen }: { menu: Menu; onOpen: () => void }) {
   return (
     <div style={{ background: '#fff', border: '1px solid #EFE3D5', borderRadius: 18, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       <button onClick={onOpen} style={{ border: 'none', background: 'none', padding: 0, display: 'block', position: 'relative' }}>
-        <ImageSlot src={menu.image} label={`Foto ${menu.name}`} style={{ width: '100%', height: 124 }} />
+        <ImageSlot src={imageFor(menu.image, menu.imageVariants, 'card')} label={`Foto ${menu.name}`} style={{ width: '100%', height: 124 }} />
         <span style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(43,29,18,0.78)', color: '#fff', fontSize: 10.5, fontWeight: 700, borderRadius: 99, padding: '3px 9px', whiteSpace: 'nowrap' }}>{tagOf(menu)}</span>
       </button>
       <div style={{ padding: '11px 12px 12px', display: 'flex', flexDirection: 'column', flex: 1 }}>
@@ -96,7 +97,7 @@ function ListCard({ menu, onOpen }: { menu: Menu; onOpen: () => void }) {
   return (
     <div style={{ background: '#fff', border: '1px solid #EFE3D5', borderRadius: 16, padding: 11, display: 'flex', gap: 12, alignItems: 'center' }}>
       <button onClick={onOpen} style={{ border: 'none', background: 'none', padding: 0, flexShrink: 0 }}>
-        <ImageSlot src={menu.image} label="Foto" radius={13} style={{ width: 82, height: 82 }} />
+        <ImageSlot src={imageFor(menu.image, menu.imageVariants, 'thumb')} label="Foto" radius={13} style={{ width: 82, height: 82 }} />
       </button>
       <div style={{ flex: 1, minWidth: 0 }}>
         <button onClick={onOpen} style={{ border: 'none', background: 'none', padding: 0, textAlign: 'left', fontSize: 14, fontWeight: 700, color: '#3B2A20' }}>{menu.name}</button>

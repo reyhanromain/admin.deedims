@@ -24,6 +24,7 @@ export interface Menu {
   description: string
   category: string | null
   image: string
+  imageVariants?: Partial<Record<'thumb' | 'card' | 'detail' | 'large', string>> | null
   variants: Variant[]
   addons: Addon[]
   freeAddons: { menuId: number; name: string }[]

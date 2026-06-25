@@ -4,8 +4,10 @@ import { createWriteStream } from 'node:fs'
 import { unlink } from 'node:fs/promises'
 import { pipeline } from 'node:stream/promises'
 import path from 'node:path'
+import sharp from 'sharp'
 import { config } from '../config'
 import { HttpError, ok } from '../lib/http'
+import { IMAGE_VARIANT_SPECS, imageVariantName, imageVariantUrls, type ImageVariantKey } from '../lib/imageVariants'
 
 const ALLOWED = new Map<string, string>([
   ['image/jpeg', 'jpg'],
@@ -35,7 +37,30 @@ export async function uploadsRoutes(app: FastifyInstance) {
       throw new HttpError(413, `File terlalu besar (maks ${config.maxUploadBytes / 1024 / 1024} MB)`, 'PAYLOAD_TOO_LARGE')
     }
 
+    const variants = await generateVariants(dest, name, ext, app.log.warn.bind(app.log))
+
     reply.code(201)
-    return ok({ url: `/uploads/${name}` })
+    return ok({ url: `/uploads/${name}`, variants })
   })
+}
+
+async function generateVariants(sourcePath: string, originalName: string, ext: string, warn: (obj: unknown, msg?: string) => void) {
+  const urls = imageVariantUrls(`/uploads/${originalName}`)!
+  const generated: Partial<Record<ImageVariantKey, string>> = {}
+
+  for (const [key, spec] of Object.entries(IMAGE_VARIANT_SPECS) as Array<[ImageVariantKey, (typeof IMAGE_VARIANT_SPECS)[ImageVariantKey]]>) {
+    const variantName = imageVariantName(originalName, key)
+    const variantPath = path.join(path.resolve(config.uploadsDir), variantName)
+    try {
+      let image = sharp(sourcePath, { animated: ext !== 'gif' }).rotate().resize({ width: spec.width, height: spec.height, fit: spec.fit, withoutEnlargement: true })
+      if (ext === 'gif') image = sharp(sourcePath, { pages: 1 }).rotate().resize({ width: spec.width, height: spec.height, fit: spec.fit, withoutEnlargement: true })
+      await image.webp({ quality: 82, effort: 4 }).toFile(variantPath)
+      generated[key] = urls[key]
+    } catch (error) {
+      await unlink(variantPath).catch(() => {})
+      warn({ err: error, variant: key, source: originalName }, 'Gagal membuat varian gambar')
+    }
+  }
+
+  return generated
 }

@@ -10,8 +10,8 @@ beforeAll(async () => { app = await makeApp() })
 afterAll(async () => { await app.close(); await prisma.$disconnect() })
 beforeEach(async () => { await resetDb(); token = await tokenFor(app) })
 
-const PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+const JPG = Buffer.from(
+  '/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAACAAIDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAABgj/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABykX//Z',
   'base64',
 )
 
@@ -22,16 +22,25 @@ function multipart(buf: Buffer, filename: string, contentType: string) {
 }
 
 describe('uploads', () => {
-  it('upload PNG → 201 + data.url, file tersaji di /uploads', async () => {
-    const { headers, payload } = multipart(PNG, 'a.png', 'image/png')
+  it('upload JPG → 201 + data.url + variants, file tersaji di /uploads', async () => {
+    const { headers, payload } = multipart(JPG, 'a.jpg', 'image/jpeg')
     const res = await app.inject({ method: 'POST', url: '/api/uploads', headers, payload })
     expect(res.statusCode).toBe(201)
-    const url = data(res).url
-    expect(url).toMatch(/^\/uploads\/.+\.png$/)
+    const body = data(res)
+    const url = body.url
+    expect(url).toMatch(/^\/uploads\/.+\.jpg$/)
+    expect(body.variants.thumb).toMatch(/^\/uploads\/.+@thumb\.webp$/)
+    expect(body.variants.card).toMatch(/^\/uploads\/.+@card\.webp$/)
+    expect(body.variants.detail).toMatch(/^\/uploads\/.+@detail\.webp$/)
+    expect(body.variants.large).toMatch(/^\/uploads\/.+@large\.webp$/)
 
     const served = await app.inject({ method: 'GET', url })
     expect(served.statusCode).toBe(200)
-    expect(served.headers['content-type']).toContain('image/png')
+    expect(served.headers['content-type']).toContain('image/jpeg')
+
+    const thumb = await app.inject({ method: 'GET', url: body.variants.thumb })
+    expect(thumb.statusCode).toBe(200)
+    expect(thumb.headers['content-type']).toContain('image/webp')
   })
 
   it('tipe bukan gambar → 415', async () => {
@@ -49,7 +58,7 @@ describe('uploads', () => {
 
   it('tanpa auth → 401', async () => {
     const form = new FormData()
-    form.append('file', PNG, { filename: 'a.png', contentType: 'image/png' })
+    form.append('file', JPG, { filename: 'a.jpg', contentType: 'image/jpeg' })
     const res = await app.inject({ method: 'POST', url: '/api/uploads', headers: form.getHeaders(), payload: form })
     expect(res.statusCode).toBe(401)
   })

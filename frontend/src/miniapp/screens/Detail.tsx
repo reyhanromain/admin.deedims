@@ -1,6 +1,7 @@
 import { useMini } from '../store'
 import { fmt } from '../helpers'
 import { ImageSlot, Icon, PATH } from '../ui'
+import { imageFor } from '../../imageVariants'
 
 export function Detail() {
   const { state, actions } = useMini()
@@ -10,7 +11,7 @@ export function Detail() {
 
   return (
     <div style={{ animation: 'ddScreen 0.25s ease' }}>
-      <ImageSlot src={menu.image} label={`Foto ${menu.name}`} style={{ width: '100%', height: 230 }} />
+      <ImageSlot src={imageFor(menu.image, menu.imageVariants, 'detail')} label={`Foto ${menu.name}`} style={{ width: '100%', height: 230 }} />
       <div style={{ padding: '18px 16px 22px' }}>
         <div style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 21, fontWeight: 800, color: '#3B2A20', letterSpacing: '-0.02em', lineHeight: 1.15 }}>{menu.name}</div>
         <div style={{ fontSize: 13, color: '#8A7263', marginTop: 6, lineHeight: 1.5 }}>{menu.description}</div>
