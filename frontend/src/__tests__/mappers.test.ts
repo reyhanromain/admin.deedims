@@ -39,9 +39,10 @@ describe('mapStock / mapMenu', () => {
     expect(mapStock({ id: 1, label: 's1', name: 'S', quantity: 5, unit: null })).toEqual({ id: 1, label: 's1', name: 'S', quantity: 5, unit: 'pcs' })
   })
   it('menu: isActive→active, imageUrl→image, variant {stockId,qty}, addons', () => {
-    const m = mapMenu({ id: 1, name: 'A', description: null, basePrice: 10000, unitLabel: 'pack', isActive: false, isAddon: false, imageUrl: '/uploads/a.png', variants: [{ name: 'Reg', price: 10000, imageUrl: '/uploads/v.png', stockId: 2, qty: 3 }], addons: [4], freeAddons: [4] })
-    expect(m).toMatchObject({ active: false, unitLabel: 'pack', image: '/uploads/a.png', addons: [4], freeAddons: [4] })
-    expect(m.variants[0]).toEqual({ name: 'Reg', price: 10000, image: '/uploads/v.png', stockId: 2, qty: 3 })
+    const variants = { thumb: '/uploads/a@thumb.webp', card: '/uploads/a@card.webp' }
+    const m = mapMenu({ id: 1, name: 'A', description: null, basePrice: 10000, unitLabel: 'pack', isActive: false, isAddon: false, imageUrl: '/uploads/a.png', imageVariants: variants, variants: [{ name: 'Reg', price: 10000, imageUrl: '/uploads/v.png', imageVariants: variants, stockId: 2, qty: 3 }], addons: [4], freeAddons: [4] })
+    expect(m).toMatchObject({ active: false, unitLabel: 'pack', image: '/uploads/a.png', imageVariants: variants, addons: [4], freeAddons: [4] })
+    expect(m.variants[0]).toEqual({ name: 'Reg', price: 10000, image: '/uploads/v.png', imageVariants: variants, stockId: 2, qty: 3 })
   })
 })
 

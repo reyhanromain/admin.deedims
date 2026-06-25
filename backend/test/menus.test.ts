@@ -28,7 +28,7 @@ describe('menus', () => {
     })
     expect(res.statusCode).toBe(201)
     expect(data(res)).toMatchObject({ unitLabel: 'pack' })
-    expect(data(res).variants[0]).toEqual({ name: 'V', price: 9000, imageUrl: '/uploads/v.png', stockId: 1, qty: 1 })
+    expect(data(res).variants[0]).toEqual({ name: 'V', price: 9000, imageUrl: '/uploads/v.png', imageVariants: null, stockId: 1, qty: 1 })
     expect(data(res).addons).toEqual([2])
     expect(data(res).freeAddons).toEqual([2])
     const links = await prisma.menuAddon.findMany({ where: { menuId: data(res).id, addonMenuId: 2 }, orderBy: { isFree: 'asc' } })

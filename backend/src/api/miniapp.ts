@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../db'
 import { config } from '../config'
 import { HttpError, ok, pageMeta } from '../lib/http'
+import { existingImageVariantUrls } from '../lib/imageVariants'
 import { parsePage } from '../lib/paginate'
 import { validateInitData } from '../lib/telegramAuth'
 import {
@@ -81,6 +82,7 @@ function shapeCatalog(data: Awaited<ReturnType<typeof listOrderableMenus>>) {
         description: menu.description,
         category: menu.category,
         imageUrl: menu.imageUrl,
+        imageVariants: existingImageVariantUrls(menu.imageUrl),
         variants: menu.variants.map((v) => ({ id: v.id, name: visibleVariantName(v.name), price: v.price })),
         addons: paidAddons,
         freeAddons,

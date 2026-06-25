@@ -1,6 +1,7 @@
 import { useMini } from '../store'
 import { fulfillmentLabel, priceLabel, STATUS } from '../helpers'
 import { ImageSlot, Icon, PATH } from '../ui'
+import { imageFor } from '../../imageVariants'
 
 export function Home() {
   const { state, actions } = useMini()
@@ -85,7 +86,7 @@ export function Home() {
           <div className="dd-scroll" style={{ display: 'flex', gap: 12, overflowX: 'auto', margin: '0 -16px', padding: '0 16px 4px', scrollSnapType: 'x mandatory' }}>
             {menus.slice(0, 6).map((m) => (
               <button key={m.id} onClick={() => actions.openDetail(m.id)} style={{ flex: '0 0 158px', scrollSnapAlign: 'start', background: '#fff', border: '1px solid #EFE3D5', borderRadius: 18, overflow: 'hidden', textAlign: 'left', padding: 0 }}>
-                <ImageSlot src={m.image} label={`Foto ${m.name}`} style={{ width: '100%', height: 116 }} />
+                <ImageSlot src={imageFor(m.image, m.imageVariants, 'card')} label={`Foto ${m.name}`} style={{ width: '100%', height: 116 }} />
                 <div style={{ padding: '11px 12px 13px' }}>
                   <div style={{ fontSize: 13.5, fontWeight: 700, color: '#3B2A20', lineHeight: 1.25 }}>{m.name}</div>
                   <div style={{ fontSize: 13, fontWeight: 800, color: '#C8472B', marginTop: 6, fontFamily: "'Bricolage Grotesque', sans-serif" }}>{priceLabel(m)}</div>

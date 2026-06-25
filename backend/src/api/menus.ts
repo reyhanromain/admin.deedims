@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '../db'
 import { HttpError, ok, pageMeta } from '../lib/http'
+import { existingImageVariantUrls } from '../lib/imageVariants'
 import { parsePage } from '../lib/paginate'
 
 const idOf = (req: { params: unknown }) => Number((req.params as { id: string }).id)
@@ -24,12 +25,14 @@ function shapeMenu(m: MenuRow) {
     isActive: m.isActive,
     isAddon: m.isAddon,
     imageUrl: m.imageUrl,
+    imageVariants: existingImageVariantUrls(m.imageUrl),
     unitLabel: m.unitLabel,
     category: m.category,
     variants: m.variants.map((v) => ({
       name: v.name,
       price: v.price,
       imageUrl: v.imageUrl,
+      imageVariants: existingImageVariantUrls(v.imageUrl),
       stockId: v.stockUsages[0]?.stockItemId ?? null,
       qty: v.stockUsages[0]?.quantity ?? null,
     })),

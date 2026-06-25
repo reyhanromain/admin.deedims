@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { api, clearToken, getToken, setToken } from './api'
 import { getDevUserId, getInitData, getTelegramUser } from './telegram'
 import type { CartItem, CartStyle, Catalog, CatalogLayout, Menu, OrderDetail, OrderRow, Screen } from './types'
+import { imageFor } from '../imageVariants'
 
 interface MiniState {
   booting: boolean
@@ -186,7 +187,7 @@ export function MiniProvider({ children }: { children: ReactNode }) {
         const cart = existing
           ? s.cart.map((c) => (c.key === key ? { ...c, qty: c.qty + s.dQty } : c))
           : [...s.cart, {
-              uid: Date.now(), key, menuId: menu.id, variantId: variant.id, slotImage: menu.image,
+              uid: Date.now(), key, menuId: menu.id, variantId: variant.id, slotImage: imageFor(menu.image, menu.imageVariants, 'thumb'),
               name: menu.name, variantName: variant.name, unit, addons, qty: s.dQty,
             }]
         showToast(`${s.dQty}× ${menu.name} masuk keranjang`)

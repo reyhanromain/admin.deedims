@@ -6,6 +6,7 @@ import { pipeline } from 'node:stream/promises'
 import path from 'node:path'
 import { config } from '../config'
 import { HttpError, ok } from '../lib/http'
+import { generateImageVariants } from '../lib/imageVariants'
 
 const ALLOWED = new Map<string, string>([
   ['image/jpeg', 'jpg'],
@@ -35,7 +36,9 @@ export async function uploadsRoutes(app: FastifyInstance) {
       throw new HttpError(413, `File terlalu besar (maks ${config.maxUploadBytes / 1024 / 1024} MB)`, 'PAYLOAD_TOO_LARGE')
     }
 
+    const variants = await generateImageVariants(dest, name, config.uploadsDir, app.log.warn.bind(app.log))
+
     reply.code(201)
-    return ok({ url: `/uploads/${name}` })
+    return ok({ url: `/uploads/${name}`, variants })
   })
 }
