@@ -4,6 +4,23 @@ All notable product changes for Deedims are tracked here.
 
 This project follows [Semantic Versioning](https://semver.org/) for the deployable product version and [Conventional Commits](https://www.conventionalcommits.org/) for commit messages.
 
+## [2.5.0] - 2026-06-26
+
+### Added
+
+- Sync admin CMS screens with browser URLs so direct navigation and back/forward history work for dashboard, orders, menus, customers, stock, settings, subscribers, and pre-orders.
+
+### Changed
+
+- Always show the Telegram bot cart edit action so customers can remove individual cart items before checkout.
+- Split composed bot message templates into explicit CMS-editable templates for cart editing, payment prompts, variant quantity prompts, and variant-aware cart/order lines.
+- Bold key pre-order values in start, reminder, and order detail bot messages for clearer customer-facing copy.
+- Seed bot message templates during reset/reseed and safely migrate unchanged legacy default templates on startup.
+
+### Fixed
+
+- Lazy-load menu images in the CMS and mini app surfaces to reduce aborted image requests during navigation and editing.
+
 ## [2.4.0] - 2026-06-25
 
 ### Added
