@@ -27,7 +27,7 @@ export function Header({ mobileHidden = false }: { mobileHidden?: boolean }) {
         flexWrap: isMobile ? 'wrap' : 'nowrap',
         maxHeight: collapsed ? 0 : 140,
         opacity: collapsed ? 0 : 1,
-        overflow: 'hidden',
+        overflow: s.profileOpen ? 'visible' : 'hidden',
         transform: collapsed ? 'translateY(-8px)' : 'translateY(0)',
         transition: 'max-height 0.18s ease, padding 0.18s ease, opacity 0.14s ease, transform 0.18s ease, border-width 0.18s ease',
         pointerEvents: collapsed ? 'none' : 'auto',
