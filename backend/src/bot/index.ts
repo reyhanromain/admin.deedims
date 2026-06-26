@@ -176,7 +176,7 @@ async function handleCallback(ctx: Context, user: TelegramCustomer, data: string
     if (p[1] === 'empty') return editTemplate(ctx, 'cart_empty_confirm', {}, new InlineKeyboard().text('Yes, empty cart', 'c:empty_yes').row().text('Back', 'c:back'))
     if (p[1] === 'empty_yes') { await clearCart(user.id); return editTemplate(ctx, 'cart_emptied') }
     if (p[1] === 'edit') return showCartEditor(ctx, user, positive(p[2]), true)
-    if (p[1] === 'del') { await deleteCartItem(user.id, positive(p[2])); return showCartEditor(ctx, user, positive(p[3]), true, await renderTemplate('cart_item_deleted_prefix')) }
+    if (p[1] === 'del') { await deleteCartItem(user.id, positive(p[2])); return showCartEditor(ctx, user, positive(p[3]), true, true) }
     if (p[1] === 'checkout') return showPayment(ctx, user)
     if (p[1] === 'cod') {
       const order = await checkout(user)
@@ -249,15 +249,23 @@ async function showQuantity(ctx: Context, user: TelegramCustomer, variantId: num
   for (let qty = 1; qty <= Math.min(3, capacity); qty++) keyboard.text(`Add ${qty}${unitLabel ? ` ${unitLabel}` : ''}`, `o:q:${variantId}:${qty}:${page}`).row()
   keyboard.text('Back', `o:m:${variant.menuId}:${page}`).row().text('Cancel', 'o:cancel')
   const contents = variant.stockUsages.map((usage) => `${usage.quantity}${usage.stockItem.unit ? ` ${usage.stockItem.unit}` : ''} ${usage.stockItem.name}`)
-  const contentBlock = contents.length === 1
-    ? await renderTemplate('variant_quantity_single_content', { content: contents[0] })
+  const hasVariant = visibleVariantName(variant.name)
+  const template = hasVariant
+    ? contents.length > 1
+      ? 'variant_quantity_prompt_with_variant_multi_content'
+      : contents.length === 1
+        ? 'variant_quantity_prompt_with_variant_single_content'
+        : 'variant_quantity_prompt_with_variant'
     : contents.length > 1
-      ? await renderTemplate('variant_quantity_multi_content', { contents: contents.map((item) => `- ${item}`).join('\n') })
-      : ''
-  const caption = await renderTemplate('variant_quantity_prompt', {
+      ? 'variant_quantity_prompt_with_multi_content'
+      : contents.length === 1
+        ? 'variant_quantity_prompt_with_single_content'
+        : 'variant_quantity_prompt'
+  const caption = await renderTemplate(template, {
     menu_name: variant.menu.name,
-    variant_line: visibleVariantName(variant.name) ? await renderTemplate('variant_quantity_variant_line', { variant_name: variant.name }) : '',
-    content_block: contentBlock,
+    variant_name: variant.name,
+    content: contents[0] ?? '',
+    contents: contents.map((item) => `- ${item}`).join('\n'),
     price: money(variant.price),
   })
   const imageUrl = variant.imageUrl ?? variant.menu.imageUrl
@@ -296,16 +304,16 @@ async function showCart(ctx: Context, user: TelegramCustomer, editing: boolean) 
   if (!cart.main.length) return respondTemplate(ctx, editing, 'cart_empty')
   const itemLines: string[] = []
   for (const [index, item] of cart.main.entries()) {
-    itemLines.push(await renderTemplate('cart_item_line', {
+    itemLines.push(await renderTemplate(item.variantNameSnapshot ? 'cart_item_line_with_variant' : 'cart_item_line', {
       number: index + 1,
       menu_name: item.menuNameSnapshot,
-      variant_name: item.variantNameSnapshot ? ` (${item.variantNameSnapshot})` : '',
+      variant_name: item.variantNameSnapshot ?? '',
       quantity: item.quantity,
       line_total: money(item.unitPrice * item.quantity),
     }))
-    for (const addon of item.addons) itemLines.push(await renderTemplate('cart_addon_line', {
+    for (const addon of item.addons) itemLines.push(await renderTemplate(addon.variantNameSnapshot ? 'cart_addon_line_with_variant' : 'cart_addon_line', {
       menu_name: addon.menuNameSnapshot,
-      variant_name: addon.variantNameSnapshot ? ` (${addon.variantNameSnapshot})` : '',
+      variant_name: addon.variantNameSnapshot ?? '',
       quantity: addon.quantity,
       line_total: money(addon.unitPrice * addon.quantity),
     }))
@@ -324,9 +332,9 @@ async function showCart(ctx: Context, user: TelegramCustomer, editing: boolean) 
   return respond(ctx, editing, text, keyboard)
 }
 
-async function showCartEditor(ctx: Context, user: TelegramCustomer, requestedPage: number, editing: boolean, prefix = '') {
+async function showCartEditor(ctx: Context, user: TelegramCustomer, requestedPage: number, editing: boolean, deleted = false) {
   const cart = await getCart(user.id)
-  if (!cart.main.length) return respondTemplate(ctx, editing, 'cart_empty_after_delete', { prefix })
+  if (!cart.main.length) return respondTemplate(ctx, editing, deleted ? 'cart_empty_after_delete' : 'cart_empty')
   const size = positive(await setting('cart_edit_page_size', '8')) || 8
   const pages = Math.max(1, Math.ceil(cart.main.length / size)); const page = Math.min(requestedPage, pages)
   const keyboard = new InlineKeyboard()
@@ -335,12 +343,12 @@ async function showCartEditor(ctx: Context, user: TelegramCustomer, requestedPag
   if (page < pages) keyboard.text('Next', `c:edit:${page + 1}`)
   if (pages > 1) keyboard.row()
   keyboard.text('Back', 'c:back')
-  return respondTemplate(ctx, editing, 'cart_edit_prompt', { prefix }, keyboard)
+  return respondTemplate(ctx, editing, deleted ? 'cart_item_deleted_continue' : 'cart_edit_prompt', {}, keyboard)
 }
 
 async function showPayment(ctx: Context, user: TelegramCustomer) {
   const preview = await checkoutPreview(user.id)
-  return editTemplate(ctx, 'payment_prompt', { total: money(preview.total), price_changed_note: preview.priceChanged ? await renderTemplate('payment_price_changed_note') : '' }, new InlineKeyboard().text('COD', 'c:cod').row().text('Back', 'c:back'))
+  return editTemplate(ctx, preview.priceChanged ? 'payment_prompt_price_changed' : 'payment_prompt', { total: money(preview.total) }, new InlineKeyboard().text('COD', 'c:cod').row().text('Back', 'c:back'))
 }
 
 async function showOrderList(ctx: Context, user: TelegramCustomer, requestedPage: number, editing: boolean) {
@@ -394,9 +402,9 @@ async function showOrderDetail(ctx: Context, user: TelegramCustomer, orderId: nu
       quantity: item.quantity,
       line_total: money(item.lineTotal),
     }))
-    for (const addon of order.items.filter((candidate) => candidate.parentOrderItemId === item.id)) lines.push(await renderTemplate('order_detail_addon_line', {
+    for (const addon of order.items.filter((candidate) => candidate.parentOrderItemId === item.id)) lines.push(await renderTemplate(addon.variantNameSnapshot ? 'order_detail_addon_line_with_variant' : 'order_detail_addon_line', {
       menu_name: addon.menuNameSnapshot,
-      variant_name: addon.variantNameSnapshot ? ` (${addon.variantNameSnapshot})` : '',
+      variant_name: addon.variantNameSnapshot ?? '',
       quantity: addon.quantity,
       line_total: money(addon.lineTotal),
     }))

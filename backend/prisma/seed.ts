@@ -4,6 +4,7 @@ import { copyFileSync, mkdirSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { generateImageVariants } from '../src/lib/imageVariants'
+import { upsertBotMessageTemplates } from '../src/bot/templates'
 
 const prisma = new PrismaClient()
 const seedDir = path.dirname(fileURLToPath(import.meta.url))
@@ -187,6 +188,7 @@ async function seedUsers() {
 
 async function seedSettings() {
   await prisma.setting.createMany({ data: starterSettings })
+  await upsertBotMessageTemplates()
 }
 
 async function seedCatalog() {
