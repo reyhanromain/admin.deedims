@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 import { makeApp, resetDb, tokenFor, authH, prisma, data, meta, errOf } from './helpers'
-import { renderTemplate } from '../src/bot/templates'
+import { renderTemplate, upsertBotMessageTemplates } from '../src/bot/templates'
 
 let app: FastifyInstance
 let token: string
@@ -75,10 +75,11 @@ describe('settings & subscribers', () => {
     const reminder = data(res).find((s: { label: string }) => s.label === 'preorder_reminder_notification')
     expect(start).toMatchObject({ inputType: 'html', category: 'bot_messages_start' })
     expect(start.placeholders).toContain('preorder_title')
-    expect(start.value).toContain('Pekan pengambilan/pengiriman: {{fulfillment_week}}')
+    expect(start.value).toContain('Pekan pengambilan/pengiriman: <b>{{fulfillment_week}}</b>')
     expect(cartSummary).toMatchObject({ inputType: 'html', category: 'bot_messages_cart' })
+    expect(cartSummary.value).toContain('{{items}}\n\nTotal harga: {{total}}')
     expect(orderRow.placeholders).toContain('order_status')
-    expect(reminder.value).toContain('Pekan pengambilan/pengiriman: {{fulfillment_week}}')
+    expect(reminder.value).toContain('Pekan pengambilan/pengiriman: <b>{{fulfillment_week}}</b>')
   })
   it('template bot menolak placeholder tidak dikenal', async () => {
     const setting = await prisma.setting.findUniqueOrThrow({ where: { label: 'start_open' } })
@@ -103,7 +104,19 @@ describe('settings & subscribers', () => {
       preorder_description: 'Batch akhir bulan',
       fulfillment_week: '22–26 Juni 2026',
       fulfillment_note: 'Ambil sore',
-    })).resolves.toContain('Pekan pengambilan/pengiriman: 22–26 Juni 2026')
+    })).resolves.toContain('Pekan pengambilan/pengiriman: <b>22–26 Juni 2026</b>')
+  })
+  it('template bot memigrasikan default lama tanpa menimpa custom value', async () => {
+    await prisma.setting.update({
+      where: { label: 'cart_empty_after_delete' },
+      data: { value: '{{prefix}}Sekarang keranjang kakak sudah kosong.\nKalau mau mulai pesan lagi, silakan kirim /order ya 😊' },
+    })
+    await prisma.setting.update({ where: { label: 'cart_edit_prompt' }, data: { value: 'Custom prompt {{prefix}}' } })
+    await upsertBotMessageTemplates()
+    await expect(prisma.setting.findUniqueOrThrow({ where: { label: 'cart_empty_after_delete' } })).resolves.toMatchObject({
+      value: 'Item berhasil dihapus dari keranjang kak.\n\nSekarang keranjang kakak sudah kosong.\nKalau mau mulai pesan lagi, silakan kirim /order ya 😊',
+    })
+    await expect(prisma.setting.findUniqueOrThrow({ where: { label: 'cart_edit_prompt' } })).resolves.toMatchObject({ value: 'Custom prompt {{prefix}}' })
   })
   it('list subscribers ramping + paginated', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/subscribers', headers: authH(token) })

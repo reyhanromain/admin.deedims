@@ -27,7 +27,7 @@ export const BOT_MESSAGE_TEMPLATES = {
   start_open: {
     label: 'start_open', category: 'bot_messages_start', sortOrder: 103,
     description: 'Balasan /start saat pre-order terbuka.',
-    defaultValue: '{{intro}}\n\nPre-order sedang dibuka ya kak 🎉\n\n{{preorder_title}}\n{{preorder_description}}\nPekan pengambilan/pengiriman: {{fulfillment_week}}\nCatatan: {{fulfillment_note}}\n\nSilakan kirim /order untuk memesan ya kak.',
+    defaultValue: '{{intro}}\n\nPre-order sedang dibuka ya kak 🎉\n\n<b>{{preorder_title}}</b>\n<b>{{preorder_description}}</b>\nPekan pengambilan/pengiriman: <b>{{fulfillment_week}}</b>\nCatatan: <b>{{fulfillment_note}}</b>\n\nSilakan kirim /order untuk memesan ya kak.',
     placeholders: ['intro', 'preorder_title', 'preorder_description', 'fulfillment_week', 'fulfillment_note'],
   },
   reminder_subscribed: {
@@ -64,7 +64,7 @@ export const BOT_MESSAGE_TEMPLATES = {
   system_error: {
     label: 'system_error', category: 'bot_messages_general', sortOrder: 303,
     description: 'Balasan saat terjadi error sistem.',
-    defaultValue: 'Terjadi kendala saat memproses permintaan kak. Silakan coba lagi sebentar lagi ya.',
+    defaultValue: 'Terjadi kendala saat memproses permintaan kak. Silakan coba lagi nanti ya.',
   },
   stale_choice: {
     label: 'stale_choice', category: 'bot_messages_general', sortOrder: 304,
@@ -131,32 +131,44 @@ export const BOT_MESSAGE_TEMPLATES = {
   },
   variant_quantity_prompt: {
     label: 'variant_quantity_prompt', category: 'bot_messages_order', sortOrder: 412,
-    description: 'Prompt pilih jumlah untuk satu varian menu.',
-    defaultValue: '{{menu_name}}\n{{variant_line}}{{content_block}}Harga: {{price}}\n\nPilih jumlah yang ingin ditambahkan.',
-    placeholders: ['menu_name', 'variant_line', 'content_block', 'price'],
+    description: 'Prompt pilih jumlah tanpa varian dan tanpa isi stock.',
+    defaultValue: '{{menu_name}}\n\nHarga: {{price}}\n\nPilih jumlah yang ingin ditambahkan.',
+    placeholders: ['menu_name', 'price'],
   },
-  variant_quantity_variant_line: {
-    label: 'variant_quantity_variant_line', category: 'bot_messages_order', sortOrder: 413,
-    description: 'Baris nama varian di prompt jumlah.',
-    defaultValue: 'Varian: {{variant_name}}\n',
-    placeholders: ['variant_name'],
+  variant_quantity_prompt_with_variant: {
+    label: 'variant_quantity_prompt_with_variant', category: 'bot_messages_order', sortOrder: 413,
+    description: 'Prompt pilih jumlah dengan varian tanpa isi stock.',
+    defaultValue: '{{menu_name}}\n\nVarian: {{variant_name}}\nHarga: {{price}}\n\nPilih jumlah yang ingin ditambahkan.',
+    placeholders: ['menu_name', 'variant_name', 'price'],
   },
-  variant_quantity_single_content: {
-    label: 'variant_quantity_single_content', category: 'bot_messages_order', sortOrder: 414,
-    description: 'Baris isi untuk varian dengan satu stock usage.',
-    defaultValue: 'Isi: {{content}}\n',
-    placeholders: ['content'],
+  variant_quantity_prompt_with_single_content: {
+    label: 'variant_quantity_prompt_with_single_content', category: 'bot_messages_order', sortOrder: 414,
+    description: 'Prompt pilih jumlah tanpa varian dengan satu isi stock.',
+    defaultValue: '{{menu_name}}\n\nIsi: {{content}}\nHarga: {{price}}\n\nPilih jumlah yang ingin ditambahkan.',
+    placeholders: ['menu_name', 'content', 'price'],
   },
-  variant_quantity_multi_content: {
-    label: 'variant_quantity_multi_content', category: 'bot_messages_order', sortOrder: 415,
-    description: 'Blok isi untuk varian dengan beberapa stock usage.',
-    defaultValue: 'Isi:\n{{contents}}\n',
-    placeholders: ['contents'],
+  variant_quantity_prompt_with_variant_single_content: {
+    label: 'variant_quantity_prompt_with_variant_single_content', category: 'bot_messages_order', sortOrder: 415,
+    description: 'Prompt pilih jumlah dengan varian dan satu isi stock.',
+    defaultValue: '{{menu_name}}\n\nVarian: {{variant_name}}\nIsi: {{content}}\nHarga: {{price}}\n\nPilih jumlah yang ingin ditambahkan.',
+    placeholders: ['menu_name', 'variant_name', 'content', 'price'],
   },
-  cart_item_deleted_prefix: {
-    label: 'cart_item_deleted_prefix', category: 'bot_messages_cart', sortOrder: 514,
-    description: 'Prefix setelah satu item dihapus dari cart.',
-    defaultValue: 'Item berhasil dihapus dari keranjang kak.\n\n',
+  variant_quantity_prompt_with_multi_content: {
+    label: 'variant_quantity_prompt_with_multi_content', category: 'bot_messages_order', sortOrder: 416,
+    description: 'Prompt pilih jumlah tanpa varian dengan beberapa isi stock.',
+    defaultValue: '{{menu_name}}\n\nIsi:\n{{contents}}\nHarga: {{price}}\n\nPilih jumlah yang ingin ditambahkan.',
+    placeholders: ['menu_name', 'contents', 'price'],
+  },
+  variant_quantity_prompt_with_variant_multi_content: {
+    label: 'variant_quantity_prompt_with_variant_multi_content', category: 'bot_messages_order', sortOrder: 417,
+    description: 'Prompt pilih jumlah dengan varian dan beberapa isi stock.',
+    defaultValue: '{{menu_name}}\n\nVarian: {{variant_name}}\nIsi:\n{{contents}}\nHarga: {{price}}\n\nPilih jumlah yang ingin ditambahkan.',
+    placeholders: ['menu_name', 'variant_name', 'contents', 'price'],
+  },
+  cart_item_deleted_continue: {
+    label: 'cart_item_deleted_continue', category: 'bot_messages_cart', sortOrder: 514,
+    description: 'Balasan setelah satu item dihapus dan cart masih berisi item lain.',
+    defaultValue: 'Item berhasil dihapus dari keranjang kak.\n\nPilih item lain yang ingin kakak hapus dari keranjang.\n\nSaat ini fitur edit hanya mendukung hapus item ya kak.',
   },
   cart_empty: {
     label: 'cart_empty', category: 'bot_messages_cart', sortOrder: 501,
@@ -166,14 +178,12 @@ export const BOT_MESSAGE_TEMPLATES = {
   cart_empty_after_delete: {
     label: 'cart_empty_after_delete', category: 'bot_messages_cart', sortOrder: 502,
     description: 'Balasan setelah item terakhir cart dihapus.',
-    defaultValue: '{{prefix}}Sekarang keranjang kakak sudah kosong.\nKalau mau mulai pesan lagi, silakan kirim /order ya 😊',
-    placeholders: ['prefix'],
+    defaultValue: 'Item berhasil dihapus dari keranjang kak.\n\nSekarang keranjang kakak sudah kosong.\nKalau mau mulai pesan lagi, silakan kirim /order ya 😊',
   },
   cart_edit_prompt: {
     label: 'cart_edit_prompt', category: 'bot_messages_cart', sortOrder: 503,
     description: 'Prompt memilih item cart untuk dihapus.',
-    defaultValue: '{{prefix}}Pilih item yang ingin kakak hapus dari keranjang.\n\nSaat ini fitur edit hanya mendukung hapus item ya kak.',
-    placeholders: ['prefix'],
+    defaultValue: 'Pilih item yang ingin kakak hapus dari keranjang.\n\nSaat ini fitur edit hanya mendukung hapus item ya kak.',
   },
   cart_empty_confirm: {
     label: 'cart_empty_confirm', category: 'bot_messages_cart', sortOrder: 504,
@@ -188,8 +198,14 @@ export const BOT_MESSAGE_TEMPLATES = {
   payment_prompt: {
     label: 'payment_prompt', category: 'bot_messages_cart', sortOrder: 506,
     description: 'Prompt memilih metode pembayaran.',
-    defaultValue: 'Pilih metode pembayaran ya kak.\n\nTotal pembayaran: {{total}}{{price_changed_note}}\n\nUntuk saat ini metode pembayaran yang tersedia adalah COD.',
-    placeholders: ['total', 'price_changed_note'],
+    defaultValue: 'Pilih metode pembayaran ya kak.\n\nTotal pembayaran: {{total}}\n\nUntuk saat ini metode pembayaran yang tersedia adalah COD.',
+    placeholders: ['total'],
+  },
+  payment_prompt_price_changed: {
+    label: 'payment_prompt_price_changed', category: 'bot_messages_cart', sortOrder: 513,
+    description: 'Prompt memilih metode pembayaran saat harga terbaru diterapkan.',
+    defaultValue: 'Pilih metode pembayaran ya kak.\n\nTotal pembayaran: {{total}}\nHarga menu terbaru sudah diterapkan pada total ini.\n\nUntuk saat ini metode pembayaran yang tersedia adalah COD.',
+    placeholders: ['total'],
   },
   checkout_success: {
     label: 'checkout_success', category: 'bot_messages_cart', sortOrder: 507,
@@ -200,19 +216,31 @@ export const BOT_MESSAGE_TEMPLATES = {
   cart_summary: {
     label: 'cart_summary', category: 'bot_messages_cart', sortOrder: 508,
     description: 'Ringkasan cart sebelum checkout.',
-    defaultValue: 'Cart kakak:\n\n{{items}}\nTotal harga: {{total}}\n\nTotal stock di keranjang:\n{{stock_lines}}\n\nStatus stock: {{stock_status}}',
+    defaultValue: 'Cart kakak:\n\n{{items}}\n\nTotal harga: {{total}}\n\nTotal stock di keranjang:\n{{stock_lines}}\n\nStatus stock: {{stock_status}}',
     placeholders: ['items', 'total', 'stock_lines', 'stock_status'],
   },
   cart_item_line: {
     label: 'cart_item_line', category: 'bot_messages_cart', sortOrder: 509,
-    description: 'Format baris menu utama di cart.',
-    defaultValue: '{{number}}. {{menu_name}}{{variant_name}} x{{quantity}} — {{line_total}}',
+    description: 'Format baris menu utama tanpa varian di cart.',
+    defaultValue: '{{number}}. {{menu_name}} x{{quantity}} — {{line_total}}',
+    placeholders: ['number', 'menu_name', 'quantity', 'line_total'],
+  },
+  cart_item_line_with_variant: {
+    label: 'cart_item_line_with_variant', category: 'bot_messages_cart', sortOrder: 509,
+    description: 'Format baris menu utama dengan varian di cart.',
+    defaultValue: '{{number}}. {{menu_name}} ({{variant_name}}) x{{quantity}} — {{line_total}}',
     placeholders: ['number', 'menu_name', 'variant_name', 'quantity', 'line_total'],
   },
   cart_addon_line: {
     label: 'cart_addon_line', category: 'bot_messages_cart', sortOrder: 510,
-    description: 'Format baris add-on di cart.',
-    defaultValue: '   Add-on: {{menu_name}}{{variant_name}} x{{quantity}} — {{line_total}}',
+    description: 'Format baris add-on tanpa varian di cart.',
+    defaultValue: '   Add-on: {{menu_name}} x{{quantity}} — {{line_total}}',
+    placeholders: ['menu_name', 'quantity', 'line_total'],
+  },
+  cart_addon_line_with_variant: {
+    label: 'cart_addon_line_with_variant', category: 'bot_messages_cart', sortOrder: 510,
+    description: 'Format baris add-on dengan varian di cart.',
+    defaultValue: '   Add-on: {{menu_name}} ({{variant_name}}) x{{quantity}} — {{line_total}}',
     placeholders: ['menu_name', 'variant_name', 'quantity', 'line_total'],
   },
   cart_stock_status_sufficient: {
@@ -226,8 +254,8 @@ export const BOT_MESSAGE_TEMPLATES = {
     defaultValue: 'Tidak cukup',
   },
   payment_price_changed_note: {
-    label: 'payment_price_changed_note', category: 'bot_messages_cart', sortOrder: 513,
-    description: 'Catatan di payment prompt saat harga terbaru diterapkan.',
+    label: 'payment_price_changed_note', category: 'bot_messages_cart', sortOrder: 520,
+    description: 'Deprecated: catatan lama untuk payment prompt saat harga terbaru diterapkan.',
     defaultValue: '\nHarga menu terbaru sudah diterapkan pada total ini.',
   },
   my_orders_empty: {
@@ -276,7 +304,7 @@ export const BOT_MESSAGE_TEMPLATES = {
   order_detail_preorder: {
     label: 'order_detail_preorder', category: 'bot_messages_my_orders', sortOrder: 610,
     description: 'Blok pre-order di detail order.',
-    defaultValue: 'Pre-order:\n{{preorder_title}}\nPekan pengambilan/pengiriman: {{fulfillment_week}}\nCatatan: {{fulfillment_note}}',
+    defaultValue: 'Pre-order:\n<b>{{preorder_title}}</b>\nPekan pengambilan/pengiriman: <b>{{fulfillment_week}}</b>\nCatatan: <b>{{fulfillment_note}}</b>',
     placeholders: ['preorder_title', 'fulfillment_week', 'fulfillment_note'],
   },
   order_detail_admin_notes: {
@@ -298,8 +326,14 @@ export const BOT_MESSAGE_TEMPLATES = {
   },
   order_detail_addon_line: {
     label: 'order_detail_addon_line', category: 'bot_messages_my_orders', sortOrder: 614,
-    description: 'Format add-on di detail order.',
-    defaultValue: '   Add-on: {{menu_name}}{{variant_name}} x{{quantity}} — {{line_total}}',
+    description: 'Format add-on tanpa varian di detail order.',
+    defaultValue: '   Add-on: {{menu_name}} x{{quantity}} — {{line_total}}',
+    placeholders: ['menu_name', 'quantity', 'line_total'],
+  },
+  order_detail_addon_line_with_variant: {
+    label: 'order_detail_addon_line_with_variant', category: 'bot_messages_my_orders', sortOrder: 614,
+    description: 'Format add-on dengan varian di detail order.',
+    defaultValue: '   Add-on: {{menu_name}} ({{variant_name}}) x{{quantity}} — {{line_total}}',
     placeholders: ['menu_name', 'variant_name', 'quantity', 'line_total'],
   },
   reorder_note_header: {
@@ -326,7 +360,7 @@ export const BOT_MESSAGE_TEMPLATES = {
   preorder_reminder_notification: {
     label: 'preorder_reminder_notification', category: 'bot_messages_reminder', sortOrder: 205,
     description: 'Notifikasi saat pre-order dibuka untuk subscriber reminder.',
-    defaultValue: 'Halo kak 👋\nPre-order Deedims sudah dibuka ya!\n\n{{preorder_title}}\n{{preorder_description}}\nPekan pengambilan/pengiriman: {{fulfillment_week}}\nCatatan: {{fulfillment_note}}\n\nKalau kakak mau pesan, silakan kirim /order.\n\nKalau tidak ingin menerima reminder lagi, kirim /stop_preorder_reminder.',
+    defaultValue: 'Halo kak 👋\nPre-order Deedims sudah dibuka ya!\n\n<b>{{preorder_title}}</b>\n<b>{{preorder_description}}</b>\nPekan pengambilan/pengiriman: <b>{{fulfillment_week}}</b>\nCatatan: <b>{{fulfillment_note}}</b>\n\nKalau kakak mau pesan, silakan kirim /order.\n\nKalau tidak ingin menerima reminder lagi, kirim /stop_preorder_reminder.',
     placeholders: ['preorder_title', 'preorder_description', 'fulfillment_week', 'fulfillment_note'],
   },
   order_status_notification: {
@@ -350,6 +384,21 @@ export const BOT_MESSAGE_TEMPLATES = {
 } as const satisfies Record<string, TemplateDefinition>
 
 export const MESSAGE_TEMPLATE_KEYS = new Set(Object.keys(BOT_MESSAGE_TEMPLATES))
+
+const LEGACY_TEMPLATE_DEFAULTS: Record<string, readonly string[]> = {
+  start_open: ['{{intro}}\n\nPre-order sedang dibuka ya kak 🎉\n\n{{preorder_title}}\n{{preorder_description}}\nPekan pengambilan/pengiriman: {{fulfillment_week}}\nCatatan: {{fulfillment_note}}\n\nSilakan kirim /order untuk memesan ya kak.'],
+  system_error: ['Terjadi kendala saat memproses permintaan kak. Silakan coba lagi sebentar lagi ya.'],
+  variant_quantity_prompt: ['{{menu_name}}\n{{variant_line}}{{content_block}}Harga: {{price}}\n\nPilih jumlah yang ingin ditambahkan.'],
+  cart_empty_after_delete: ['{{prefix}}Sekarang keranjang kakak sudah kosong.\nKalau mau mulai pesan lagi, silakan kirim /order ya 😊'],
+  cart_edit_prompt: ['{{prefix}}Pilih item yang ingin kakak hapus dari keranjang.\n\nSaat ini fitur edit hanya mendukung hapus item ya kak.'],
+  payment_prompt: ['Pilih metode pembayaran ya kak.\n\nTotal pembayaran: {{total}}{{price_changed_note}}\n\nUntuk saat ini metode pembayaran yang tersedia adalah COD.'],
+  cart_summary: ['Cart kakak:\n\n{{items}}\nTotal harga: {{total}}\n\nTotal stock di keranjang:\n{{stock_lines}}\n\nStatus stock: {{stock_status}}'],
+  cart_item_line: ['{{number}}. {{menu_name}}{{variant_name}} x{{quantity}} — {{line_total}}'],
+  cart_addon_line: ['   Add-on: {{menu_name}}{{variant_name}} x{{quantity}} — {{line_total}}'],
+  order_detail_preorder: ['Pre-order:\n{{preorder_title}}\nPekan pengambilan/pengiriman: {{fulfillment_week}}\nCatatan: {{fulfillment_note}}'],
+  order_detail_addon_line: ['   Add-on: {{menu_name}}{{variant_name}} x{{quantity}} — {{line_total}}'],
+  preorder_reminder_notification: ['Halo kak 👋\nPre-order Deedims sudah dibuka ya!\n\n{{preorder_title}}\n{{preorder_description}}\nPekan pengambilan/pengiriman: {{fulfillment_week}}\nCatatan: {{fulfillment_note}}\n\nKalau kakak mau pesan, silakan kirim /order.\n\nKalau tidak ingin menerima reminder lagi, kirim /stop_preorder_reminder.'],
+}
 
 const editorAllowedTags = new Set(['b', 'strong', 'i', 'em', 'u', 'ins', 's', 'strike', 'del', 'code', 'pre', 'a', 'br', 'p'])
 const placeholderPattern = /{{\s*([a-zA-Z0-9_]+)\s*}}/g
@@ -396,6 +445,13 @@ export async function upsertBotMessageTemplates() {
         sortOrder: template.sortOrder,
       },
     })
+    const legacyValues = LEGACY_TEMPLATE_DEFAULTS[template.label]
+    if (legacyValues?.length) {
+      await prisma.setting.updateMany({
+        where: { label: template.label, value: { in: [...legacyValues] } },
+        data: { value: template.defaultValue },
+      })
+    }
   }
 }
 
