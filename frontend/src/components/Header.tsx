@@ -119,6 +119,17 @@ export function Header({ mobileHidden = false }: { mobileHidden?: boolean }) {
                 </button>
               </div>
               <HoverButton
+                onClick={s.openCurrentUserEditor}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 9, border: 'none', background: 'none',
+                  color: t.ink, fontSize: 13, fontWeight: 700, padding: '11px 12px', borderRadius: 9, textAlign: 'left',
+                }}
+                hover={{ background: t.surfaceAlt }}
+              >
+                <Icon size={16} path="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
+                Edit profil / password
+              </HoverButton>
+              <HoverButton
                 onClick={s.doLogout}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: 9, border: 'none', background: 'none',
