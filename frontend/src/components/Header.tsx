@@ -27,7 +27,7 @@ export function Header({ mobileHidden = false }: { mobileHidden?: boolean }) {
         flexWrap: isMobile ? 'wrap' : 'nowrap',
         maxHeight: collapsed ? 0 : 140,
         opacity: collapsed ? 0 : 1,
-        overflow: 'hidden',
+        overflow: s.profileOpen ? 'visible' : 'hidden',
         transform: collapsed ? 'translateY(-8px)' : 'translateY(0)',
         transition: 'max-height 0.18s ease, padding 0.18s ease, opacity 0.14s ease, transform 0.18s ease, border-width 0.18s ease',
         pointerEvents: collapsed ? 'none' : 'auto',
@@ -118,6 +118,17 @@ export function Header({ mobileHidden = false }: { mobileHidden?: boolean }) {
                   />
                 </button>
               </div>
+              <HoverButton
+                onClick={s.openCurrentUserEditor}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 9, border: 'none', background: 'none',
+                  color: t.ink, fontSize: 13, fontWeight: 700, padding: '11px 12px', borderRadius: 9, textAlign: 'left',
+                }}
+                hover={{ background: t.surfaceAlt }}
+              >
+                <Icon size={16} path="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
+                Edit profil / password
+              </HoverButton>
               <HoverButton
                 onClick={s.doLogout}
                 style={{

@@ -98,7 +98,7 @@ const LIST_FETCHERS: Record<ListKey, (p: { page: number; limit: number; status?:
   settings: (p) => api.settingsList(p),
 }
 
-interface CurrentUser { username: string; name: string; super: boolean }
+interface CurrentUser { id: number; username: string; name: string; super: boolean }
 
 interface State {
   authed: boolean
@@ -249,6 +249,7 @@ export interface AdminStore extends State {
   createStock: () => void
   // users
   createUser: () => void
+  openCurrentUserEditor: () => void
   openUserEditor: (u: User) => void
   closeUserEditor: () => void
   updateUserDraft: (patch: Partial<UserDraft>) => void
@@ -445,7 +446,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const validateSession = useCallback(async () => {
     try {
       const me = await api.me()
-      setState((s) => ({ ...s, authed: true, booting: false, currentUser: { username: me.username, name: me.fullName, super: me.isSuper } }))
+      setState((s) => ({ ...s, authed: true, booting: false, currentUser: { id: me.id, username: me.username, name: me.fullName, super: me.isSuper } }))
     } catch {
       clearToken()
       setState((s) => ({ ...s, authed: false, booting: false }))
@@ -665,7 +666,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
           try {
             const { token, user } = await api.login(un, state.loginPass)
             setToken(token)
-            setState((s) => ({ ...s, authed: true, booting: false, loginPass: '', currentUser: { username: user.username, name: user.fullName, super: user.isSuper }, screen: currentAdminScreen(), selectedOrderId: null, selectedCustomerU: null }))
+            setState((s) => ({ ...s, authed: true, booting: false, loginPass: '', currentUser: { id: user.id, username: user.username, name: user.fullName, super: user.isSuper }, screen: currentAdminScreen(), selectedOrderId: null, selectedCustomerU: null }))
             showToast('Selamat datang, ' + user.fullName.split(' ')[0])
           } catch (e) {
             showToast(e instanceof ApiError ? e.message : 'Login gagal')
@@ -804,18 +805,19 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         })()
       },
       saveMenu: () => {
-        const d = state.menuDraft
+        const current = stateRef.current
+        const d = current.menuDraft
         if (!d) return
         if (!d.name.trim()) { showToast('Nama menu wajib diisi'); return }
         const body = menuToApi(d)
         void (async () => {
           try {
-            if (state.editMenuId === 'new') {
+            if (current.editMenuId === 'new') {
               const m = await api.createMenu(body)
               update((s) => ({ lists: withRows(s, 'menus', (rows) => [mapMenu(m), ...rows]), editMenuId: null, menuDraft: null }))
               showToast('Menu baru dibuat')
             } else {
-              const id = state.editMenuId as number
+              const id = current.editMenuId as number
               const m = await api.updateMenu(id, body)
               update((s) => ({ lists: withRows(s, 'menus', (rows) => rows.map((x) => (x.id === id ? mapMenu(m) : x))), editMenuId: null, menuDraft: null }))
               showToast('Menu diperbarui')
@@ -857,6 +859,11 @@ export function AdminProvider({ children }: { children: ReactNode }) {
           } catch (e) { fail(e) }
         })()
       },
+      openCurrentUserEditor: () => {
+        const me = stateRef.current.currentUser
+        if (!me) return
+        set({ profileOpen: false, editUserU: me.username, userDraft: { name: me.name, username: me.username, password: '', super: me.super } })
+      },
       openUserEditor: (u) => set({ editUserU: u.username, userDraft: { name: u.name, username: u.username, password: '', super: u.super } }),
       closeUserEditor: () => set({ editUserU: null, userDraft: null }),
       updateUserDraft: (patch) => update((s) => (s.userDraft ? { userDraft: { ...s.userDraft, ...patch } } : {})),
@@ -866,14 +873,22 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         const un = (d.username || '').trim().toLowerCase().replace(/\s+/g, '')
         if (!un) { showToast('Username wajib diisi'); return }
         if (state.lists.users.rows.some((u) => u.username === un && u.username !== state.editUserU)) { showToast('Username "' + un + '" sudah dipakai'); return }
-        const target = state.lists.users.rows.find((u) => u.username === state.editUserU)
+        const currentTarget = state.currentUser && state.currentUser.username === state.editUserU
+          ? { id: state.currentUser.id, username: state.currentUser.username }
+          : null
+        const target = state.lists.users.rows.find((u) => u.username === state.editUserU) ?? currentTarget
         if (!target || target.id == null) return
         const body: Record<string, unknown> = { username: un, fullName: (d.name || '').trim() || un }
         if ((d.password || '').trim()) body.password = d.password
         void (async () => {
           try {
             const r = await api.updateUser(target.id!, body)
-            update((s) => ({ lists: withRows(s, 'users', (rows) => rows.map((u) => (u.username === state.editUserU ? mapUser(r) : u))), editUserU: null, userDraft: null }))
+            update((s) => ({
+              currentUser: s.currentUser?.id === r.id ? { id: r.id, username: r.username, name: r.fullName, super: r.isSuper } : s.currentUser,
+              lists: withRows(s, 'users', (rows) => rows.map((u) => (u.username === state.editUserU ? mapUser(r) : u))),
+              editUserU: null,
+              userDraft: null,
+            }))
             showToast('Admin @' + un + ' diperbarui')
           } catch (e) { fail(e) }
         })()
