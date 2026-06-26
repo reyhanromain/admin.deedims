@@ -1,7 +1,7 @@
 {
   "name": "deedims-admin-cms",
   "private": true,
-  "version": "2.4.0",
+  "version": "2.5.0",
   "type": "module",
   "description": "Deedims Admin CMS — pre-order dimsum management dashboard",
   "scripts": {
