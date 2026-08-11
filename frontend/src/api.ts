@@ -165,7 +165,7 @@ export const mapOrderRow = (r: any): OrderRow => ({
 export const mapOrderDetail = (r: any): OrderDetail => ({
   id: r.id, code: r.code, customer: r.customer ?? '', username: r.username ?? '',
   createdAt: fmtDateTime(r.createdAt), updatedAt: fmtDateTime(r.updatedAt), status: r.status, pay: r.pay,
-  adminNotes: r.adminNotes ?? '', cancelRequested: r.cancelRequested, total: r.total,
+  notes: r.notes ?? '', adminNotes: r.adminNotes ?? '', cancelRequested: r.cancelRequested, total: r.total,
   items: (r.items ?? []).map((it: any) => ({
     name: it.menuNameSnapshot, meta: variantMeta(it.variantNameSnapshot), qty: it.quantity, price: it.unitPrice,
     addon: it.variantNameSnapshot === 'Add-on',

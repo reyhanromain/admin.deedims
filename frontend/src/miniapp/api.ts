@@ -184,7 +184,6 @@ export interface SubmitPayload {
   items: SubmitItem[]
   name?: string
   phone?: string
-  method?: 'cod' | 'pickup'
   note?: string
 }
 

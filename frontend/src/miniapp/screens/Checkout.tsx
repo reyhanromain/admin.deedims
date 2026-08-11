@@ -9,14 +9,9 @@ function metaLine(c: CartItem): string {
   return parts.length ? '· ' + parts.join(' · ') : ''
 }
 
-const METHODS = [
-  { key: 'cod', label: 'COD', sub: 'Bayar saat terima' },
-  { key: 'pickup', label: 'Pickup', sub: 'Ambil di lokasi' },
-] as const
-
 export function Checkout() {
   const { state, actions } = useMini()
-  const { cart, coMethod } = state
+  const { cart } = state
   const total = cart.reduce((sum, c) => sum + c.unit * c.qty, 0)
 
   return (
@@ -33,29 +28,11 @@ export function Checkout() {
         </div>
       </div>
 
-      <div style={{ fontSize: 13, fontWeight: 700, color: '#3B2A20', margin: '18px 0 10px' }}>Metode ambil</div>
-      <div style={{ display: 'flex', gap: 10 }}>
-        {METHODS.map((m) => {
-          const on = coMethod === m.key
-          return (
-            <button key={m.key} onClick={() => actions.setCheckout({ coMethod: m.key })} style={{ flex: 1, border: `1.5px solid ${on ? '#C8472B' : '#EFE3D5'}`, background: on ? '#FBEAE4' : '#fff', borderRadius: 14, padding: '13px 12px', textAlign: 'left' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 13.5, fontWeight: 700, color: '#3B2A20' }}>{m.label}</span>
-                <span style={{ width: 18, height: 18, borderRadius: 99, border: `2px solid ${on ? '#C8472B' : '#D4C4B0'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {on && <span style={{ width: 9, height: 9, borderRadius: 99, background: '#C8472B' }} />}
-                </span>
-              </div>
-              <div style={{ fontSize: 11, color: '#8A7263', marginTop: 4 }}>{m.sub}</div>
-            </button>
-          )
-        })}
-      </div>
-
-      <div style={{ fontSize: 13, fontWeight: 700, color: '#3B2A20', margin: '18px 0 10px' }}>{coMethod === 'pickup' ? 'Catatan (waktu ambil, dll)' : 'Catatan & alamat'}</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: '#3B2A20', margin: '18px 0 10px' }}>Catatan &amp; alamat</div>
       <textarea
         value={state.coNote}
         onChange={(e) => actions.setCheckout({ coNote: e.target.value })}
-        placeholder={coMethod === 'pickup' ? 'Mis. ambil sore jam 4' : 'Mis. patokan alamat, jam kirim...'}
+        placeholder="Mis. patokan alamat, jam kirim..."
         rows={3}
         style={{ width: '100%', padding: 12, border: '1px solid #E4D5C3', borderRadius: 13, fontSize: 13.5, color: '#3B2A20', outline: 'none', background: '#fff', resize: 'none', lineHeight: 1.5 }}
       />
