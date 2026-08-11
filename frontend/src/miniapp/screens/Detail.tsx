@@ -37,6 +37,32 @@ export function Detail() {
           </div>
         )}
 
+        {/* free add-ons — selalu ikut tiap pesanan (ditambahkan server saat submit),
+            jadi tampil sebagai radio terpilih yang dibekukan: bukan pilihan user. */}
+        {menu.freeAddons.length > 0 && (
+          <div style={{ marginTop: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 9 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#3B2A20' }}>Gratis</div>
+              <div style={{ fontSize: 11.5, color: '#A99681' }}>sudah termasuk</div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+              {menu.freeAddons.map((f) => (
+                <div
+                  key={f.menuId}
+                  aria-disabled="true"
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, border: '1.5px solid #D8E6DC', background: '#F1F7F2', borderRadius: 13, padding: '12px 14px', cursor: 'default' }}
+                >
+                  <span style={{ width: 20, height: 20, borderRadius: 99, border: '2px solid #2E5A43', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <span style={{ width: 10, height: 10, borderRadius: 99, background: '#2E5A43', display: 'block' }} />
+                  </span>
+                  <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: '#3B2A20' }}>{f.name}</span>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: '#2E5A43', fontFamily: "'Bricolage Grotesque', sans-serif" }}>{fmt(0)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* add-ons */}
         {menu.addons.length > 0 && (
           <div style={{ marginTop: 20 }}>
@@ -58,13 +84,6 @@ export function Detail() {
                 )
               })}
             </div>
-          </div>
-        )}
-
-        {/* free addons note */}
-        {menu.freeAddons.length > 0 && (
-          <div style={{ marginTop: 14, fontSize: 11.5, color: '#2E5A43', fontWeight: 600 }}>
-            Gratis: {menu.freeAddons.map((f) => f.name).join(', ')}
           </div>
         )}
 
