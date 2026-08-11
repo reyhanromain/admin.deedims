@@ -30,7 +30,6 @@ interface MiniState {
 
   coName: string
   coPhone: string
-  coMethod: 'cod' | 'pickup'
   coNote: string
 
   expandedOrderId: number | null
@@ -59,7 +58,6 @@ const initialState: MiniState = {
   cart: [],
   coName: '',
   coPhone: '',
-  coMethod: 'cod',
   coNote: '',
   expandedOrderId: null,
   lastOrder: null,
@@ -82,7 +80,7 @@ export interface MiniActions {
   incItem: (uid: number) => void
   decItem: (uid: number) => void
   removeItem: (uid: number) => void
-  setCheckout: (patch: Partial<Pick<MiniState, 'coName' | 'coPhone' | 'coMethod' | 'coNote'>>) => void
+  setCheckout: (patch: Partial<Pick<MiniState, 'coName' | 'coPhone' | 'coNote'>>) => void
   placeOrder: () => Promise<void>
   toggleOrder: (id: number) => void
   cancelOrder: (id: number) => Promise<void>
@@ -199,7 +197,7 @@ export function MiniProvider({ children }: { children: ReactNode }) {
         try {
           const res = await api.submitOrder({
             items: s.cart.map((c) => ({ variantId: c.variantId, quantity: c.qty, addonVariantIds: c.addons.map((a) => a.variantId) })),
-            name: s.coName.trim(), phone: s.coPhone.trim(), method: s.coMethod, note: s.coNote.trim() || undefined,
+            name: s.coName.trim(), phone: s.coPhone.trim(), note: s.coNote.trim() || undefined,
           })
           update({ cart: [], lastOrder: { code: res.code, total: res.total }, screen: 'success' })
           scrollTop()

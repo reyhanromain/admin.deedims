@@ -153,6 +153,8 @@ export interface OrderDetail {
   updatedAt: string
   status: OrderStatus
   pay: PayStatus
+  /** Catatan dari customer saat checkout mini app (nomor WA + catatannya). Read-only. */
+  notes: string
   adminNotes: string
   cancelRequested: boolean
   total: number

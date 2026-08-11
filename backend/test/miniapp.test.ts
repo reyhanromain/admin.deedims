@@ -76,7 +76,7 @@ describe('miniapp submit order', () => {
     const { variantId, addonVariantId } = await variantIds()
     const res = await app.inject({
       method: 'POST', url: '/api/miniapp/orders', headers: auth(token),
-      payload: { items: [{ variantId, quantity: 2, addonVariantIds: [addonVariantId] }], name: 'Sari', phone: '0812', method: 'cod', note: 'pedas' },
+      payload: { items: [{ variantId, quantity: 2, addonVariantIds: [addonVariantId] }], name: 'Sari', phone: '0812', note: 'pedas' },
     })
     expect(res.statusCode).toBe(201)
     const d = data(res)
@@ -93,8 +93,25 @@ describe('miniapp submit order', () => {
     const order = await prisma.order.findUnique({ where: { id: d.id }, include: { items: true } })
     expect(order?.telegramUserId).toBe(111n)
     expect(order?.notes).toContain('WA: 0812')
+    expect(order?.notes).toContain('pedas')
     expect(order?.items).toHaveLength(2)
     expect(order?.items.find((it) => it.parentOrderItemId != null)?.menuNameSnapshot).toBe('Addon B')
+  })
+
+  // Sistem hanya mendukung COD (bot pun hanya menawarkan COD), jadi tidak ada lagi
+  // pilihan metode: `method` yang masih dikirim klien lama diabaikan, tidak bocor ke notes.
+  it('metode ambil tidak lagi dicatat — payload lama diabaikan', async () => {
+    const token = await customerToken()
+    const { variantId } = await variantIds()
+    const res = await app.inject({
+      method: 'POST', url: '/api/miniapp/orders', headers: auth(token),
+      payload: { items: [{ variantId, quantity: 1, addonVariantIds: [] }], name: 'Sari', phone: '0812', method: 'pickup' },
+    })
+    expect(res.statusCode).toBe(201)
+    const order = await prisma.order.findUnique({ where: { id: data(res).id } })
+    expect(order?.notes ?? '').not.toContain('Metode')
+    expect(order?.notes ?? '').not.toContain('Pickup')
+    expect(order?.paymentMethod).toBe('cod')
   })
 
   it('harga klien diabaikan — tetap pakai harga DB', async () => {
