@@ -352,7 +352,6 @@ export type SubmitOrderItem = {
 export type SubmitOrderMeta = {
   name?: string
   phone?: string
-  method?: string
   note?: string
 }
 
@@ -513,7 +512,6 @@ export async function submitOrder(customer: TelegramCustomer, items: SubmitOrder
 function composeOrderNotes(meta: SubmitOrderMeta) {
   const lines: string[] = []
   if (meta.phone?.trim()) lines.push(`WA: ${meta.phone.trim()}`)
-  if (meta.method) lines.push(`Metode: ${meta.method === 'pickup' ? 'Pickup' : 'COD'}`)
   if (meta.note?.trim()) lines.push(meta.note.trim())
   return lines.length ? lines.join('\n') : null
 }

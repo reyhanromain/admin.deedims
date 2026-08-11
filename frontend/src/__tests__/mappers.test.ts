@@ -54,7 +54,7 @@ describe('mapOrderRow / mapOrderDetail', () => {
   it('detail: item snapshot → {name,meta,addon}, preOrder → pekan fulfillment', () => {
     const d = mapOrderDetail({
       id: 1, code: 'DD-1', customer: 'Sari', username: 'sari', createdAt: '2026-06-12T02:13:00Z', updatedAt: '2026-06-12T03:00:00Z',
-      status: 'confirmed', pay: 'pending', adminNotes: null, cancelRequested: false, total: 64000,
+      status: 'confirmed', pay: 'pending', notes: 'WA: 0812\nTitip di pos satpam', adminNotes: null, cancelRequested: false, total: 64000,
       items: [
         { menuNameSnapshot: 'Menu A', variantNameSnapshot: 'Mentai', unitPrice: 32000, quantity: 2 },
         { menuNameSnapshot: 'Saus', variantNameSnapshot: 'Add-on', unitPrice: 5000, quantity: 1 },
@@ -64,6 +64,17 @@ describe('mapOrderRow / mapOrderDetail', () => {
     expect(d.items[0]).toEqual({ name: 'Menu A', meta: 'Varian: Mentai', qty: 2, price: 32000, addon: false })
     expect(d.items[1]).toEqual({ name: 'Saus', meta: '', qty: 1, price: 5000, addon: true })
     expect(d).toMatchObject({ poTitle: 'PO Open', poFulfillmentWeek: '22–26 Juni 2026', adminNotes: '' })
+    // catatan customer diteruskan apa adanya (baris baru dipertahankan untuk ditampilkan)
+    expect(d.notes).toBe('WA: 0812\nTitip di pos satpam')
+  })
+
+  it('detail: tanpa catatan customer → string kosong', () => {
+    const d = mapOrderDetail({
+      id: 2, code: 'DD-2', customer: 'Budi', username: 'budi', createdAt: '2026-06-12T02:13:00Z', updatedAt: '2026-06-12T03:00:00Z',
+      status: 'submitted', pay: 'pending', notes: null, adminNotes: null, cancelRequested: false, total: 10000,
+      items: [], preOrder: null,
+    })
+    expect(d.notes).toBe('')
   })
 })
 

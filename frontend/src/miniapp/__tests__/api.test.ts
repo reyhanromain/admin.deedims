@@ -76,13 +76,13 @@ describe('re-auth pada 401', () => {
       .mockResolvedValueOnce(resOf(200, envelope({ token: 'tok-baru', customer: {} })))
       .mockResolvedValueOnce(resOf(201, envelope({ id: 9, code: 'DD-9', total: 1, status: 'submitted' })))
 
-    await api.submitOrder({ items: [{ variantId: 10, quantity: 3, addonVariantIds: [20] }], name: 'Sari', method: 'cod' })
+    await api.submitOrder({ items: [{ variantId: 10, quantity: 3, addonVariantIds: [20] }], name: 'Sari', phone: '0812' })
 
     const retry = fetchMock.mock.calls[2][1] as RequestInit
     expect(JSON.parse(retry.body as string)).toMatchObject({
       items: [{ variantId: 10, quantity: 3, addonVariantIds: [20] }],
       name: 'Sari',
-      method: 'cod',
+      phone: '0812',
     })
   })
 

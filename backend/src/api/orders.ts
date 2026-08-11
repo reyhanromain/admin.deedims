@@ -58,7 +58,9 @@ export async function ordersRoutes(app: FastifyInstance) {
     return ok({
       id: order.id, code: order.orderCode, customer: order.customerName ?? '', username: order.telegramUsername ?? '',
       createdAt: order.createdAt, updatedAt: order.updatedAt, status: order.orderStatus, pay: order.paymentStatus,
-      adminNotes: order.adminNotes ?? '', cancelRequested: order.cancelRequested, total: order.totalAmount,
+      // `notes` diisi customer saat checkout mini app (nomor WA + catatannya); read-only bagi admin,
+      // terpisah dari `adminNotes` yang memang ditulis admin.
+      notes: order.notes ?? '', adminNotes: order.adminNotes ?? '', cancelRequested: order.cancelRequested, total: order.totalAmount,
       items: order.items.map((it) => ({
         menuNameSnapshot: it.menuNameSnapshot, variantNameSnapshot: it.variantNameSnapshot, unitPrice: it.unitPrice, quantity: it.quantity,
       })),

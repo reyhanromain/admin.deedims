@@ -58,6 +58,20 @@ describe('order detail', () => {
     expect(d.preOrder).toMatchObject({ title: 'PO Open' })
   })
 
+  // `notes` diisi customer di checkout mini app (nomor WA + catatannya). Sebelumnya tidak
+  // ikut DTO sehingga admin tidak bisa melihat nomor WA customer di mana pun.
+  it('DTO detail memuat catatan customer, terpisah dari catatan admin', async () => {
+    await prisma.order.update({ where: { id: 1 }, data: { notes: 'WA: 0812\nTitip di pos satpam', adminNotes: 'sudah ditelepon' } })
+    const d = data(await app.inject({ method: 'GET', url: '/api/orders/1', headers: authH(token) }))
+    expect(d.notes).toBe('WA: 0812\nTitip di pos satpam')
+    expect(d.adminNotes).toBe('sudah ditelepon')
+  })
+
+  it('order tanpa catatan customer → notes string kosong', async () => {
+    await prisma.order.update({ where: { id: 1 }, data: { notes: null } })
+    expect(data(await app.inject({ method: 'GET', url: '/api/orders/1', headers: authH(token) })).notes).toBe('')
+  })
+
   it('id tak ada → 404', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/orders/999', headers: authH(token) })
     expect(res.statusCode).toBe(404)

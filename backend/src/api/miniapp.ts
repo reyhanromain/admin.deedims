@@ -47,7 +47,6 @@ const submitSchema = z.object({
   })).min(1),
   name: z.string().optional(),
   phone: z.string().optional(),
-  method: z.enum(['cod', 'pickup']).optional(),
   note: z.string().optional(),
 })
 
@@ -143,7 +142,7 @@ export async function miniappRoutes(app: FastifyInstance) {
       const order = await submitOrder(
         { id: customer.id, username: customer.username, name: customer.name },
         items,
-        { name: parsed.data.name, phone: parsed.data.phone, method: parsed.data.method, note: parsed.data.note },
+        { name: parsed.data.name, phone: parsed.data.phone, note: parsed.data.note },
       )
       reply.code(201)
       return ok({ id: order.id, code: order.orderCode, total: order.totalAmount, status: order.orderStatus })

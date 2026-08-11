@@ -247,6 +247,16 @@ function OrderDetail() {
             </div>
           </div>
 
+          {/* Ditulis customer saat checkout — read-only, jangan tercampur dengan catatan admin. */}
+          <div style={cardStyle(t, { padding: '18px 20px' })}>
+            <h3 style={{ margin: '0 0 10px 0', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: t.muted }}>Catatan customer</h3>
+            {sel.notes ? (
+              <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{sel.notes}</div>
+            ) : (
+              <div style={{ fontSize: 13, color: t.muted, fontStyle: 'italic' }}>Tidak ada catatan dari customer.</div>
+            )}
+          </div>
+
           <div style={cardStyle(t, { padding: '18px 20px' })}>
             <h3 style={{ margin: '0 0 10px 0', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: t.muted }}>Catatan admin</h3>
             <textarea
