@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { api, clearToken, getToken, setToken } from './api'
-import { getDevUserId, getInitData, getTelegramUser } from './telegram'
+import { api, clearToken } from './api'
+import { getTelegramUser } from './telegram'
 import type { CartItem, CartStyle, Catalog, CatalogLayout, Menu, OrderDetail, OrderRow, Screen } from './types'
 import { imageFor } from '../imageVariants'
 
@@ -116,13 +116,7 @@ export function MiniProvider({ children }: { children: ReactNode }) {
     let cancelled = false
     ;(async () => {
       try {
-        if (!getToken()) {
-          const initData = getInitData()
-          const devUserId = getDevUserId()
-          const tgUser = getTelegramUser()
-          const res = await api.authInit({ initData: initData || undefined, devUserId: devUserId || undefined, name: tgUser?.name })
-          setToken(res.token)
-        }
+        await api.ensureAuth()
         const [catalog, ordersRes] = await Promise.all([api.catalog(), api.ordersList(1, 20)])
         if (cancelled) return
         const tgUser = getTelegramUser()

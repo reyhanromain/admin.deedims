@@ -37,6 +37,20 @@ describe('validateInitData', () => {
     expect(() => validateInitData(initData, BOT_TOKEN, 86400)).toThrow(/kedaluwarsa/i)
   })
 
+  // Mini app yang lama dibuka memakai initData lama; batas default disamakan dengan
+  // masa berlaku JWT customer (7 hari) supaya token bisa diperbarui tanpa relaunch.
+  it('default: initData berumur 2 hari masih diterima', () => {
+    const twoDaysAgo = String(Math.floor(Date.now() / 1000) - 2 * 24 * 60 * 60)
+    const initData = buildInitData({ auth_date: twoDaysAgo, user })
+    expect(validateInitData(initData, BOT_TOKEN)).toMatchObject({ id: 111n })
+  })
+
+  it('default: initData berumur > 7 hari ditolak', () => {
+    const eightDaysAgo = String(Math.floor(Date.now() / 1000) - 8 * 24 * 60 * 60)
+    const initData = buildInitData({ auth_date: eightDaysAgo, user })
+    expect(() => validateInitData(initData, BOT_TOKEN)).toThrow(/kedaluwarsa/i)
+  })
+
   it('botToken kosong → MINIAPP_DISABLED', () => {
     expect(() => validateInitData('', '')).toThrow(/dikonfigurasi/i)
   })
