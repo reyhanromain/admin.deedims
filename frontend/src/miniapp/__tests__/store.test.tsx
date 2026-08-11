@@ -18,7 +18,7 @@ vi.mock('../api', async (orig) => {
     setToken: vi.fn(),
     clearToken: vi.fn(),
     api: {
-      authInit: vi.fn(async () => ({ token: 'tok', customer: { id: '111', name: 'Sari', username: 'sari' } })),
+      ensureAuth: vi.fn(async () => 'tok'),
       catalog: vi.fn(async () => catalog),
       ordersList: vi.fn(async () => ({ rows: orders, meta: { page: 1, limit: 20, total: orders.length, totalPages: 1 } })),
       submitOrder: vi.fn(async () => ({ id: 9, code: 'DD-NEW', total: 25000, status: 'submitted' })),
@@ -66,11 +66,10 @@ beforeEach(() => vi.clearAllMocks())
 describe('mini store boot', () => {
   it('auth (dev) → catalog + orders termuat', async () => {
     const { result } = await booted()
-    expect(api.authInit).toHaveBeenCalledTimes(1)
+    expect(api.ensureAuth).toHaveBeenCalledTimes(1)
     expect(result.current.state.authed).toBe(true)
     expect(result.current.state.menus).toHaveLength(1)
     expect(result.current.state.orders).toHaveLength(1)
-    expect(apiMod.setToken).toHaveBeenCalledWith('tok')
   })
 })
 

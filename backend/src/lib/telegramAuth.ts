@@ -1,6 +1,13 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { HttpError } from './http'
 
+/**
+ * Batas umur `auth_date` initData — disamakan dengan masa berlaku JWT customer (7 hari).
+ * Telegram tidak menyegarkan initData selama WebView mini app masih hidup, jadi batas yang
+ * lebih pendek membuat mini app yang lama dibuka gagal ambil token baru saat token kedaluwarsa.
+ */
+export const INITDATA_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
+
 /** Identitas customer hasil validasi Telegram WebApp initData. */
 export type TelegramInitUser = {
   id: bigint
@@ -20,7 +27,7 @@ function fullName(user: { first_name?: string; last_name?: string }) {
  *
  * @param maxAgeSeconds tolak initData yang `auth_date`-nya lebih tua dari ini (0 = tanpa batas).
  */
-export function validateInitData(initData: string, botToken: string, maxAgeSeconds = 86400): TelegramInitUser {
+export function validateInitData(initData: string, botToken: string, maxAgeSeconds = INITDATA_MAX_AGE_SECONDS): TelegramInitUser {
   if (!botToken) throw new HttpError(401, 'Mini app belum dikonfigurasi', 'MINIAPP_DISABLED')
   if (!initData) throw new HttpError(401, 'initData kosong', 'INITDATA_INVALID')
 

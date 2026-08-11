@@ -1,10 +1,37 @@
+import { getDevUserId, getInitData, getTelegramUser } from './telegram'
 import type { Catalog, Menu, OrderDetail, OrderRow } from './types'
 
 // ── Token customer (terpisah dari token admin CMS) ──────────
+// localStorage bisa hilang (WebView Telegram dibersihkan) dan token bisa kedaluwarsa,
+// jadi token di sini selalu dianggap sementara — lihat `authenticate` + retry di rawRequest.
 const TOKEN_KEY = 'deedims_mini_token'
-export const getToken = () => localStorage.getItem(TOKEN_KEY)
-export const setToken = (t: string) => localStorage.setItem(TOKEN_KEY, t)
-export const clearToken = () => localStorage.removeItem(TOKEN_KEY)
+// Cermin di memori: sebagian WebView Telegram memblokir/menghapus localStorage,
+// sehingga token tetap hidup selama sesi ini walau storage tidak bisa dipakai.
+let memoryToken: string | null = null
+
+export const getToken = () => {
+  try {
+    return localStorage.getItem(TOKEN_KEY) ?? memoryToken
+  } catch {
+    return memoryToken
+  }
+}
+export const setToken = (t: string) => {
+  memoryToken = t
+  try {
+    localStorage.setItem(TOKEN_KEY, t)
+  } catch {
+    /* storage diblokir — cukup andalkan memoryToken */
+  }
+}
+export const clearToken = () => {
+  memoryToken = null
+  try {
+    localStorage.removeItem(TOKEN_KEY)
+  } catch {
+    /* abaikan */
+  }
+}
 
 export class ApiError extends Error {
   status: number
@@ -25,21 +52,84 @@ interface Envelope {
 
 type Json = Record<string, unknown>
 
-async function rawRequest(method: string, path: string, body?: Json): Promise<Envelope> {
+const AUTH_PATH = '/auth'
+
+async function send(method: string, path: string, body: Json | undefined, token: string | null) {
   const headers: Record<string, string> = {}
-  const token = getToken()
   if (token) headers.Authorization = `Bearer ${token}`
   let payload: string | undefined
   if (body !== undefined) {
     headers['Content-Type'] = 'application/json'
     payload = JSON.stringify(body)
   }
-  const res = await fetch(`/api/miniapp${path}`, { method, headers, body: payload })
-  if (res.status === 401) clearToken()
+  return fetch(`/api/miniapp${path}`, { method, headers, body: payload })
+}
+
+async function unwrap(res: Response): Promise<Envelope> {
   const text = await res.text()
   const env: Envelope = text ? JSON.parse(text) : { data: null, meta: null, error: null }
   if (!res.ok || env.error) throw new ApiError(res.status, env.error?.message ?? res.statusText, env.error?.code)
   return env
+}
+
+/** Kredensial Telegram tersedia? Kalau tidak (browser biasa tanpa ?devUserId=), re-auth mustahil. */
+const canAuthenticate = () => Boolean(getInitData() || getDevUserId())
+
+let authInFlight: Promise<string> | null = null
+
+/**
+ * Tukar Telegram initData menjadi token customer lalu simpan.
+ * Dipakai saat boot *dan* saat request 401 (token kedaluwarsa / localStorage hilang).
+ * Panggilan paralel berbagi satu request agar tidak menembak /auth berkali-kali.
+ */
+export function authenticate(): Promise<string> {
+  if (authInFlight) return authInFlight
+  authInFlight = (async () => {
+    const res = await unwrap(
+      await send('POST', AUTH_PATH, {
+        initData: getInitData() || undefined,
+        devUserId: getDevUserId() || undefined,
+        name: getTelegramUser()?.name,
+      }, null),
+    )
+    const token = res.data.token as string
+    setToken(token)
+    return token
+  })()
+  authInFlight.catch(() => undefined).then(() => { authInFlight = null })
+  return authInFlight
+}
+
+/**
+ * Satu request ke API mini app. Bila server menjawab 401 (token kedaluwarsa atau hilang),
+ * ambil token baru dari initData lalu ulangi request sekali — tanpa ini checkout gagal
+ * dengan pesan "Unauthorized" dan baru pulih setelah mini app dibuka ulang.
+ */
+async function rawRequest(method: string, path: string, body?: Json): Promise<Envelope> {
+  const attempted = getToken()
+  let res = await send(method, path, body, attempted)
+
+  if (res.status === 401 && path !== AUTH_PATH) {
+    const refreshed = getToken()
+    if (refreshed && refreshed !== attempted) {
+      // Request lain sudah memperbarui token lebih dulu → cukup ulangi.
+      res = await send(method, path, body, refreshed)
+    } else if (canAuthenticate()) {
+      try {
+        res = await send(method, path, body, await authenticate())
+      } catch (err) {
+        clearToken()
+        // Re-auth gagal (mis. initData kedaluwarsa) → minta user membuka ulang dari bot.
+        if (err instanceof ApiError && err.status === 401) {
+          throw new ApiError(401, 'Sesi berakhir. Tutup mini app lalu buka lagi dari bot.', 'SESSION_EXPIRED')
+        }
+        throw err
+      }
+    }
+  }
+
+  if (res.status === 401) clearToken()
+  return unwrap(res)
 }
 
 const request = async <T>(method: string, path: string, body?: Json): Promise<T> =>
@@ -99,8 +189,11 @@ export interface SubmitPayload {
 }
 
 export const api = {
-  authInit: (body: { initData?: string; devUserId?: string; name?: string }) =>
-    request<{ token: string; customer: { id: string | null; name: string | null; username: string | null } }>('POST', '/auth', body),
+  /** Pastikan ada token sebelum request pertama; token lama yang masih sah dipakai ulang. */
+  ensureAuth: (): Promise<string> => {
+    const token = getToken()
+    return token ? Promise.resolve(token) : authenticate()
+  },
   catalog: () => request('GET', '/catalog').then(mapCatalog),
   submitOrder: (body: SubmitPayload) =>
     request<{ id: number; code: string; total: number; status: string }>('POST', '/orders', body as unknown as Json),
