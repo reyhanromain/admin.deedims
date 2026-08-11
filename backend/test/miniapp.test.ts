@@ -124,6 +124,20 @@ describe('miniapp submit order', () => {
     const res = await app.inject({ method: 'POST', url: '/api/miniapp/orders', payload: { items: [{ variantId, quantity: 1 }], name: 'Sari' } })
     expect(res.statusCode).toBe(401)
   })
+
+  // Penyebab bug prod "gagal checkout, Unauthorized": token customer kedaluwarsa.
+  // Klien menjawabnya dengan re-auth + ulang request (lihat frontend/src/miniapp/api.ts).
+  it('token kedaluwarsa → 401 UNAUTHORIZED', async () => {
+    const expiredAt = Math.floor(Date.now() / 1000) - 60
+    const expired = app.jwt.sign({ kind: 'customer', telegramUserId: '111', exp: expiredAt })
+    const { variantId } = await variantIds()
+    const res = await app.inject({
+      method: 'POST', url: '/api/miniapp/orders', headers: auth(expired),
+      payload: { items: [{ variantId, quantity: 1, addonVariantIds: [] }], name: 'Sari' },
+    })
+    expect(res.statusCode).toBe(401)
+    expect(errOf(res).code).toBe('UNAUTHORIZED')
+  })
 })
 
 describe('miniapp orders list + detail + cancel', () => {
