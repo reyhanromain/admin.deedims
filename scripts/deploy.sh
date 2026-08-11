@@ -44,6 +44,11 @@ fi
 
 compose=(docker compose --env-file "$compose_env")
 
+# Image utilitas untuk membuat + memverifikasi backup prod. Dipakai lewat container
+# supaya deploy tidak bergantung pada binary host (tar/sqlite3) yang belum tentu ada
+# di mesin runner mana pun.
+backup_image='alpine:3.22'
+
 restart_backend_on_exit() {
   "${compose[@]}" start backend >/dev/null 2>&1 || true
 }
@@ -74,6 +79,10 @@ if [[ "$environment" == 'prod' ]] && "${compose[@]}" ps --services --status runn
   volume_name="$("${compose[@]}" config --format json | jq -r '.volumes.app_data.name')"
   mkdir -p "$backup_dir"
 
+  # Tarik image sebelum backend dimatikan — kalau tidak, unduhannya terjadi saat
+  # produksi sedang mati dan memperpanjang downtime.
+  docker image inspect "$backup_image" >/dev/null 2>&1 || docker pull "$backup_image"
+
   echo "Stopping production backend for a consistent backup..."
   "${compose[@]}" stop backend
   trap restart_backend_on_exit EXIT
@@ -81,16 +90,27 @@ if [[ "$environment" == 'prod' ]] && "${compose[@]}" ps --services --status runn
   docker run --rm \
     -v "$volume_name:/data:ro" \
     -v "$backup_dir:/backup" \
-    alpine:3.22 sh -c 'tar -czf /backup/data.tar.gz -C /data . && cp /data/app.db /backup/app.db'
+    "$backup_image" sh -c 'tar -czf /backup/data.tar.gz -C /data . && cp /data/app.db /backup/app.db'
 
-  integrity="$(sqlite3 -batch -noheader "$backup_dir/app.db" 'PRAGMA integrity_check;' | tail -1 | xargs)"
+  # Salinan sudah aman di disk; nyalakan backend lagi sebelum verifikasi agar produksi
+  # tidak ikut menunggu langkah-langkah di bawah.
+  "${compose[@]}" start backend
+  trap - EXIT
+
+  # Verifikasi di dalam container: `sqlite3` tidak dijamin terpasang di host runner.
+  # `|| true` menjaga agar container yang gagal jatuh ke pesan di bawah, bukan ke
+  # abort `set -e` tanpa keterangan.
+  integrity="$(docker run --rm \
+    -v "$backup_dir:/backup:ro" \
+    "$backup_image" sh -c 'apk add --no-cache sqlite >/dev/null 2>&1 &&
+      sqlite3 -batch -noheader /backup/app.db "PRAGMA integrity_check;"' \
+    2>/dev/null | tail -1 | xargs || true)"
   if [[ "$integrity" != 'ok' ]]; then
-    echo "Production database backup failed integrity check: $integrity" >&2
+    echo "Production database backup failed integrity check: ${integrity:-<verifikasi tidak menghasilkan output>}" >&2
     exit 1
   fi
 
   sha256sum "$backup_dir/data.tar.gz" "$backup_dir/app.db" > "$backup_dir/SHA256SUMS"
-  trap - EXIT
 fi
 
 echo "Deploying $environment..."
