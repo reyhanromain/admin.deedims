@@ -79,6 +79,15 @@ cd ~/apps/deedims-prod
 ./scripts/deploy.sh prod
 ```
 
+Git operations against the remote are retried, because a transient egress
+failure on the deploy host once took down a whole deploy: `git fetch` spent 134
+seconds failing to reach github.com and the job exited before touching a
+container. Each attempt is bounded by `timeout` — the failure mode is a hanging
+connect, so without a bound retrying would only stretch the deploy out. Tunable
+via `DEEDIMS_GIT_RETRIES` (3), `DEEDIMS_GIT_TIMEOUT` (60s per attempt), and
+`DEEDIMS_GIT_RETRY_DELAY` (10s, multiplied by attempt number). This needs
+`timeout` from coreutils on the deploy host.
+
 The script pulls with fast-forward only, runs backend and frontend verification,
 builds images, deploys the selected Compose project, and checks both HTTP health
 endpoints. A production deployment also stops the backend briefly and creates a
