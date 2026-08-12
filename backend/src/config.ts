@@ -19,6 +19,13 @@ export const config = {
   corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
   uploadsDir: process.env.UPLOADS_DIR ?? './uploads',
   maxUploadBytes: Number(process.env.MAX_UPLOAD_MB ?? 5) * 1024 * 1024,
+  // Throttle endpoint publik tanpa auth. Login dihitung per KEGAGALAN (sukses
+  // mereset), mini app auth dihitung per request karena ancamannya DoS.
+  loginRateMax: Number(process.env.LOGIN_RATE_MAX ?? 5),
+  loginRateIpMax: Number(process.env.LOGIN_RATE_IP_MAX ?? 20),
+  loginRateWindowMs: Number(process.env.LOGIN_RATE_WINDOW_MIN ?? 15) * 60 * 1000,
+  miniappAuthRateMax: Number(process.env.MINIAPP_AUTH_RATE_MAX ?? 30),
+  miniappAuthRateWindowMs: Number(process.env.MINIAPP_AUTH_RATE_WINDOW_MIN ?? 15) * 60 * 1000,
 }
 
 // Pastikan proses berjalan di timezone aplikasi (memengaruhi node-cron).

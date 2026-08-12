@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../db'
 import { config } from '../config'
 import { HttpError, ok, pageMeta } from '../lib/http'
+import { clientIp } from '../lib/clientIp'
 import { existingImageVariantUrls } from '../lib/imageVariants'
 import { parsePage } from '../lib/paginate'
 import { validateInitData } from '../lib/telegramAuth'
@@ -94,7 +95,20 @@ function shapeCatalog(data: Awaited<ReturnType<typeof listOrderableMenus>>) {
 export async function miniappRoutes(app: FastifyInstance) {
   // POST /api/miniapp/auth — validasi Telegram initData → JWT customer.
   // Dev (BOT_TOKEN kosong): terima { devUserId } tanpa validasi agar bisa dites di browser.
-  app.post('/auth', async (req) => {
+  //
+  // Di-throttle per IP dengan menghitung SEMUA request (bukan hanya kegagalan
+  // seperti login): initData diverifikasi HMAC sehingga menebaknya tak realistis,
+  // yang perlu ditahan di sini adalah endpoint publik yang menjalankan kripto
+  // lalu membuat baris Customer.
+  app.post('/auth', {
+    config: {
+      rateLimit: {
+        max: config.miniappAuthRateMax,
+        timeWindow: config.miniappAuthRateWindowMs,
+        keyGenerator: (req) => `miniapp-auth:${clientIp(req)}`,
+      },
+    },
+  }, async (req) => {
     const parsed = authSchema.safeParse(req.body)
     if (!parsed.success) throw new HttpError(400, 'Invalid payload', 'VALIDATION')
     const { initData, devUserId, name } = parsed.data
