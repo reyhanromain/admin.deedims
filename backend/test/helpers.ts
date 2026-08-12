@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import { buildServer } from '../src/server'
 import { prisma } from '../src/db'
 import { upsertBotMessageTemplates } from '../src/bot/templates'
+import { resetThrottleStore, setThrottleClock } from '../src/lib/throttle'
 
 export { prisma }
 
@@ -12,8 +13,16 @@ export async function makeApp(): Promise<FastifyInstance> {
   return app
 }
 
-/** Kosongkan semua tabel (urutan anak → induk) lalu isi fixture. */
+/**
+ * Kosongkan semua tabel (urutan anak → induk) lalu isi fixture.
+ *
+ * Ikut mereset throttle: store-nya level-modul dan `fileParallelism: false`,
+ * jadi tanpa ini hitungan menumpuk lintas file dan kegagalan yang disengaja di
+ * satu test bisa menjatuhkan test lain yang tidak berhubungan.
+ */
 export async function resetDb() {
+  resetThrottleStore()
+  setThrottleClock(null)
   await prisma.botMessage.deleteMany()
   await prisma.cartItem.deleteMany()
   await prisma.preOrderReminderLog.deleteMany()

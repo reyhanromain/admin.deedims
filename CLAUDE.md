@@ -67,6 +67,17 @@ Login: `admin` / `deedims123` (seeded super user).
   local cached rows in place (no refetch).
 - **Auth: stateless JWT** (`@fastify/jwt`), token in `localStorage`. No session table. Passwords are
   **bcrypt-hashed** (the column is named `password` but never store plaintext in prod).
+- **Throttling on the public unauthenticated POSTs** (`/api/auth/login`, `/api/miniapp/auth`) via
+  `@fastify/rate-limit` with a custom in-memory store (`backend/src/lib/throttle.ts`). Login counts
+  **only failures** and resets on success; mini app auth counts every request. Two gotchas if you
+  touch this: the store is chosen **once at plugin registration** (route `config.rateLimit` cannot
+  swap it — semantics are selected by key prefix), and the login limiter runs on `preHandler`, not
+  the plugin's default `onRequest`, because its key includes the username and the body isn't parsed
+  yet at `onRequest`. **Never key rate limiting on `req.ip`** — see the client-IP note below.
+- **Client IP comes from `CF-Connecting-IP`** (`backend/src/lib/clientIp.ts`), falling back to the
+  leftmost `X-Forwarded-For`. Fastify runs without `trustProxy`, and the chain is
+  Cloudflare → cloudflared → nginx → backend, so `req.ip` is the nginx container address — identical
+  for every client on earth. `X-Real-IP` is useless too (nginx fills it with cloudflared's address).
 - **Timezone: store UTC, display Asia/Jakarta.** Prisma stores `DateTime` as UTC by default — don't
   add conversion at the DB layer. Convert only at the edges: API/FE formatting (`api.ts` uses
   `Intl` with `timeZone: 'Asia/Jakarta'`; backend uses `src/time.ts`) and cron scheduling.

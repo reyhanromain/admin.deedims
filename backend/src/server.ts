@@ -2,12 +2,14 @@ import Fastify, { type FastifyError, type FastifyReply, type FastifyRequest } fr
 import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import multipart from '@fastify/multipart'
+import rateLimit from '@fastify/rate-limit'
 import fastifyStatic from '@fastify/static'
 import path from 'node:path'
 import { mkdirSync } from 'node:fs'
 import { ZodError } from 'zod'
 import { config } from './config'
 import { HttpError } from './lib/http'
+import { ThrottleStore } from './lib/throttle'
 import { authRoutes } from './auth/routes'
 import { dashboardRoutes } from './api/dashboard'
 import { usersRoutes } from './api/users'
@@ -71,6 +73,20 @@ export async function buildServer() {
   await app.register(cors, { origin: config.corsOrigin, credentials: true })
   await app.register(jwt, { secret: config.jwtSecret })
   await app.register(multipart, { limits: { fileSize: config.maxUploadBytes, files: 1 } })
+
+  // Throttle hanya untuk rute yang meminta lewat `config.rateLimit` (global:false).
+  // Plugin MELEMPAR apa pun yang dikembalikan errorResponseBuilder, jadi yang
+  // dikembalikan harus HttpError — dengan begitu setErrorHandler memakai cabang
+  // envelope yang sudah ada, lengkap dengan status dan code yang benar.
+  // `store` hanya dibaca di sini — config.rateLimit per route tidak bisa
+  // menggantinya, jadi satu store melayani semua rute dan memilih semantik
+  // dari prefix kunci.
+  await app.register(rateLimit, {
+    global: false,
+    store: ThrottleStore,
+    errorResponseBuilder: (_req, context) =>
+      new HttpError(context.statusCode, 'Terlalu banyak percobaan. Coba lagi nanti.', 'RATE_LIMITED'),
+  })
 
   // Sajikan foto yang di-upload (hosting lokal) di /uploads/*
   const uploadsDir = path.resolve(config.uploadsDir)
