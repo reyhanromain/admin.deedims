@@ -40,7 +40,9 @@ services:
 
   cloudflared:
     image: cloudflare/cloudflared:2026.6.1
-    user: "1000:1000"
+    # Harus cocok dengan pemilik file kredensial tunnel di host (mode 0600).
+    # UID host deploy berbeda-beda, jadi jangan dipaku ke satu nilai.
+    user: "${CLOUDFLARED_USER:-1000:1000}"
     command: tunnel --config /etc/cloudflared/config.yml run
     depends_on:
       frontend:

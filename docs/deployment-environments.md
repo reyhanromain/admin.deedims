@@ -1,15 +1,27 @@
 # Production and Staging Deployment
 
-Deedims runs two isolated Docker Compose projects on one host:
+Deedims runs two isolated Docker Compose projects on one host — the NAS
+(`nas-server`, user `claudeagent`), which also hosts the self-hosted GitHub
+Actions runner labelled `deedims-deploy`:
 
-| Environment | Branch | Hostname | Compose project | Data volume |
-| --- | --- | --- | --- | --- |
-| Production | `main` | `admin.deedims.biz.id` | `deedims-prod` | `deedims-prod-data` |
-| Staging | `dev` | `dev-admin.deedims.biz.id` | `deedims-staging` | `deedims-staging-data` |
+| Environment | Branch | Hostname | Compose project | Data volume | Host ports |
+| --- | --- | --- | --- | --- | --- |
+| Production | `main` | `admin.deedims.biz.id` | `deedims-prod` | `deedims-prod-data` | 3100 / 8080 |
+| Staging | `dev` | `dev-admin.deedims.biz.id` | `deedims-staging` | `deedims-staging-data` | 3101 / 8082 |
 
 Each environment has a dedicated checkout, JWT secret, Telegram bot token,
 SQLite database, uploads directory, Cloudflare tunnel, and loopback-only host
 ports. Never reuse the production bot token or production data in staging.
+
+Host ports are loopback-only debug handles — public traffic reaches the frontend
+through the `cloudflared` container on the Compose network, so these values only
+have to avoid collisions on the deploy host. Staging uses 8082 on the NAS
+because 8081 is taken there by an unrelated service.
+
+Only one host may run a given environment at a time. Two connectors on one
+tunnel ID split traffic across two databases, and two backends sharing a bot
+token fight over `getUpdates` (repeated 409s). Always stop the old host before
+starting the new one.
 
 ## Runtime Files
 
@@ -25,16 +37,22 @@ Create these untracked files with mode `0600`:
 Use the examples in `deploy/`. The two Compose files point to their matching
 backend env and Cloudflare credential files.
 
+`CLOUDFLARED_USER` must match the owner of `CLOUDFLARED_CREDENTIALS_FILE`. The
+credential JSON is mode 0600, so a mismatched UID leaves the tunnel unable to
+read it and the container restarts in a loop. On the NAS the deploy user is
+`claudeagent` (UID 1002), hence `CLOUDFLARED_USER=1002:1002`; the example files
+keep the 1000:1000 default.
+
 ## Controlled Deployment
 
 Production must be checked out at `main`; staging must be checked out at `dev`.
 The deployment script rejects any other branch or dirty checkout.
 
 ```bash
-cd /home/reyhanr/apps/deedims-staging
+cd ~/apps/deedims-staging
 ./scripts/deploy.sh staging
 
-cd /home/reyhanr/apps/deedims-prod
+cd ~/apps/deedims-prod
 ./scripts/deploy.sh prod
 ```
 
