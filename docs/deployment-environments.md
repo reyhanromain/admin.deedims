@@ -84,6 +84,42 @@ The generated tunnel credential JSON is mounted read-only into staging and is
 never committed. Protect the staging hostname with Cloudflare Access before it
 is shared with testers.
 
+## Moving an Environment to Another Host
+
+Order matters. Stop the old host before starting the new one — a second
+connector on the same tunnel splits traffic across two databases, and a second
+backend on the same bot token fights over `getUpdates`.
+
+1. Stop the Actions runner so no job can restart what you are about to shut
+   down: `systemctl --user stop deedims-actions-runner`.
+2. Prepare the new host without touching the live one: read-only deploy key,
+   checkouts at `main` and `dev`, tunnel credential JSONs, the four runtime env
+   files, `~/backups/deedims/prod`, and a `docker compose build` to warm the
+   layer cache so the build is not inside the downtime window.
+3. Take the stack down first, then snapshot — copying `app.db` while the backend
+   is writing risks a torn snapshot:
+
+   ```bash
+   docker compose --env-file ~/.config/deedims/<env>.compose.env down
+   docker run --rm -v deedims-<env>-data:/data:ro -v "$PWD:/backup" alpine:3.22 \
+     tar -czf /backup/<env>-data.tar.gz -C /data .
+   ```
+
+4. Restore into a **new, empty** volume on the target host and verify before
+   deploying: `PRAGMA integrity_check` must return `ok`, and the uploads file
+   count and `app.db` byte size must match the source.
+5. Run `./scripts/deploy.sh <env>` on the new host and let its health check pass.
+6. Verify the tunnel registered from the new host, the bot logged `Bot @… aktif`
+   with no repeated 409, and one uploaded image loads over the public hostname —
+   that last one is what proves uploads came across, not just the database.
+7. Move the runner last: register it on the new host with the exact labels
+   `self-hosted,Linux,X64,deedims-deploy`, install the systemd **user** unit,
+   `loginctl enable-linger`, then `./config.sh remove` on the old host. Two
+   runners sharing the label means GitHub picks one at random.
+
+Keep the old volumes until the new host has proven itself — they are the
+rollback path.
+
 ## Rollback
 
 For an application-only rollback, check out the last known-good commit in the
