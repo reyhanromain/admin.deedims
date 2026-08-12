@@ -4,6 +4,16 @@ All notable product changes for Deedims are tracked here.
 
 This project follows [Semantic Versioning](https://semver.org/) for the deployable product version and [Conventional Commits](https://www.conventionalcommits.org/) for commit messages.
 
+## [2.6.0] - 2026-08-12
+
+### Added
+
+- Throttle the two public unauthenticated POST endpoints. CMS login allows 5 failed attempts per 15 minutes for each IP + username pair, plus 20 failures per IP to blunt password spraying across usernames; a successful login clears the pair counter. Mini app auth is capped at 30 requests per IP per 15 minutes. Exceeding either returns HTTP 429 with `Retry-After` and a `RATE_LIMITED` envelope, which the CMS login screen already surfaces as a toast. All thresholds are tunable via `LOGIN_RATE_MAX`, `LOGIN_RATE_IP_MAX`, `LOGIN_RATE_WINDOW_MIN`, `MINIAPP_AUTH_RATE_MAX`, and `MINIAPP_AUTH_RATE_WINDOW_MIN`.
+
+### Fixed
+
+- Resolve the real client IP from `CF-Connecting-IP` (falling back to the leftmost `X-Forwarded-For` entry) instead of the socket address, and forward that header explicitly from nginx. Behind the Cloudflare tunnel every request reaches the backend from the same nginx container address, so any IP-keyed logic would otherwise treat all clients as one.
+
 ## [2.5.0] - 2026-06-26
 
 ### Added

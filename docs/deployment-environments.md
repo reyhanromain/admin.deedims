@@ -43,6 +43,29 @@ read it and the container restarts in a loop. On the NAS the deploy user is
 `claudeagent` (UID 1002), hence `CLOUDFLARED_USER=1002:1002`; the example files
 keep the 1000:1000 default.
 
+## Throttling
+
+The two public unauthenticated POST endpoints are rate limited. Defaults ship in
+`backend/src/config.ts`; override per environment in `<env>.backend.env` only if
+you need to.
+
+| Variable | Default | Applies to |
+| --- | --- | --- |
+| `LOGIN_RATE_MAX` | 5 | Failed logins per IP + username pair |
+| `LOGIN_RATE_IP_MAX` | 20 | Failed logins per IP, all usernames |
+| `LOGIN_RATE_WINDOW_MIN` | 15 | Window for both login counters |
+| `MINIAPP_AUTH_RATE_MAX` | 30 | All `POST /api/miniapp/auth` requests per IP |
+| `MINIAPP_AUTH_RATE_WINDOW_MIN` | 15 | Window for the mini app counter |
+
+Only failed logins count and a successful login clears the pair counter, so
+normal use never trips the limit. Counters live in memory and reset when the
+backend restarts — that is the fastest way out if you ever lock yourself out.
+
+This depends on nginx forwarding `CF-Connecting-IP`. If that header stops
+arriving, every client collapses into one bucket and a single attacker can lock
+out everyone. After changing anything in the proxy chain, verify from two
+different networks that one being blocked does not block the other.
+
 ## Controlled Deployment
 
 Production must be checked out at `main`; staging must be checked out at `dev`.
