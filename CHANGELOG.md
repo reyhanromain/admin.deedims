@@ -4,6 +4,12 @@ All notable product changes for Deedims are tracked here.
 
 This project follows [Semantic Versioning](https://semver.org/) for the deployable product version and [Conventional Commits](https://www.conventionalcommits.org/) for commit messages.
 
+## [2.6.1] - 2026-08-12
+
+### Fixed
+
+- Retry the deploy script's git fetch and pull against the remote instead of failing the whole deploy on a transient network hiccup. A staging deploy was lost this way when `git fetch` spent 134 seconds failing to reach github.com. Each attempt is bounded by `timeout` because the failure mode is a hanging connect; tune with `DEEDIMS_GIT_RETRIES`, `DEEDIMS_GIT_TIMEOUT`, and `DEEDIMS_GIT_RETRY_DELAY`.
+
 ## [2.6.0] - 2026-08-12
 
 ### Added

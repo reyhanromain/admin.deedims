@@ -53,10 +53,41 @@ restart_backend_on_exit() {
   "${compose[@]}" start backend >/dev/null 2>&1 || true
 }
 
+# Operasi git ke remote diulang saat gagal. Egress deploy host pernah gagal
+# menghubungi github.com selama 134 detik lalu menjatuhkan seluruh deploy —
+# gangguan sesaat seperti itu tidak seharusnya perlu rerun manual.
+#
+# Tiap percobaan dibatasi `timeout` karena kegagalan yang pernah terjadi adalah
+# connect timeout yang menggantung lebih dari dua menit; tanpa batas ini,
+# mengulang justru memperpanjang deploy tanpa menambah peluang berhasil.
+git_retries="${DEEDIMS_GIT_RETRIES:-3}"
+git_timeout="${DEEDIMS_GIT_TIMEOUT:-60}"
+git_retry_delay="${DEEDIMS_GIT_RETRY_DELAY:-10}"
+
+retry_git() {
+  local attempt=1 rc delay
+  while true; do
+    rc=0
+    # Status 124 berarti dihentikan `timeout`, bukan penolakan dari git.
+    timeout "$git_timeout" "$@" || rc=$?
+    if (( rc == 0 )); then
+      return 0
+    fi
+    if (( attempt >= git_retries )); then
+      echo "Perintah git gagal setelah $attempt percobaan (status $rc): $*" >&2
+      return "$rc"
+    fi
+    delay=$(( attempt * git_retry_delay ))
+    echo "Percobaan $attempt gagal (status $rc); ulangi dalam ${delay}s: $*" >&2
+    sleep "$delay"
+    attempt=$(( attempt + 1 ))
+  done
+}
+
 "${compose[@]}" config --quiet
 
-git fetch origin "$expected_branch"
-git pull --ff-only origin "$expected_branch"
+retry_git git fetch origin "$expected_branch"
+retry_git git pull --ff-only origin "$expected_branch"
 
 echo 'Running backend verification...'
 npm --prefix backend ci
