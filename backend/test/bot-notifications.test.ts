@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { prisma, resetDb } from './helpers'
-import { dispatchPreOrderReminders, notifyOrderStatus, registerTelegramSender } from '../src/bot/notifications'
+import { dispatchPreOrderReminders, notifyOrderStatus, registerTelegramSender, sendTelegramMessage } from '../src/bot/notifications'
 
 beforeEach(resetDb)
 afterEach(() => registerTelegramSender(null))
@@ -14,6 +14,7 @@ describe('bot notifications', () => {
     expect(await dispatchPreOrderReminders(1)).toEqual({ sent: 0, failed: 0 })
     expect(sender).toHaveBeenCalledTimes(1)
     expect(String(sender.mock.calls[0][1])).toContain('Pekan pengambilan/pengiriman: <b>22–26 Juni 2026</b>')
+    expect(sender.mock.calls[0][2]).toMatchObject({ parse_mode: 'HTML' })
     expect(await prisma.preOrderReminderLog.count({ where: { preOrderId: 1, status: 'sent' } })).toBe(1)
     expect(await prisma.botMessage.findFirst({ where: { direction: 'outgoing', preOrderId: 1 } })).toMatchObject({ intent: 'preorder_reminder' })
   })
@@ -32,6 +33,15 @@ describe('bot notifications', () => {
     await prisma.order.update({ where: { id: 1 }, data: { orderStatus: 'ready' } })
     await notifyOrderStatus(1, 'status')
     expect(String(sender.mock.calls[0][1])).toContain('Siap')
+    expect(sender.mock.calls[0][2]).toMatchObject({ parse_mode: 'HTML' })
     expect(await prisma.botMessage.findFirst({ where: { orderId: 1, direction: 'outgoing' } })).toMatchObject({ intent: 'order_status' })
+  })
+
+  it('mempertahankan opsi pemanggil di atas parse_mode default', async () => {
+    const sender = vi.fn(async () => ({ message_id: 93, date: Math.floor(Date.now() / 1000) }))
+    registerTelegramSender(sender)
+    const reply_markup = { inline_keyboard: [] }
+    await sendTelegramMessage(1n, '<b>halo</b>', { intent: 'bot_reply' }, { reply_markup })
+    expect(sender.mock.calls[0][2]).toEqual({ parse_mode: 'HTML', reply_markup })
   })
 })
