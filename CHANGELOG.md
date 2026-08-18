@@ -4,6 +4,12 @@ All notable product changes for Deedims are tracked here.
 
 This project follows [Semantic Versioning](https://semver.org/) for the deployable product version and [Conventional Commits](https://www.conventionalcommits.org/) for commit messages.
 
+## [2.6.2] - 2026-08-18
+
+### Fixed
+
+- Send bot notifications with `parse_mode: HTML` so the pre-order reminder and order status messages render their formatting instead of printing raw tags. The templates are stored as HTML and every placeholder is already escaped when rendered, but only the bot reply path passed the parse mode, so a subscriber opening a pre-order saw literal `<b>` and `</b>` in chat. The parse mode is now the default inside `sendTelegramMessage`, which callers can still extend with their own options.
+
 ## [2.6.1] - 2026-08-12
 
 ### Fixed

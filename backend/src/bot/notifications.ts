@@ -11,6 +11,11 @@ export function registerTelegramSender(next: Sender | null) {
   sender = next
 }
 
+// Semua teks bot berasal dari template `settings` ber-inputType html dan sudah
+// meng-escape nilai placeholder di renderTemplate(), jadi parse_mode HTML adalah
+// default yang benar untuk setiap pengirim. Sebelumnya default ini hanya dipasang
+// di jalur balasan bot, sehingga notifikasi (reminder pre-order, status order)
+// terkirim mentah dan tag seperti <b> muncul apa adanya di chat.
 export async function sendTelegramMessage(
   chatId: bigint,
   text: string,
@@ -18,7 +23,7 @@ export async function sendTelegramMessage(
   options?: Record<string, unknown>,
 ) {
   if (!sender) return null
-  const sent = await sender(chatId, text, options)
+  const sent = await sender(chatId, text, { parse_mode: 'HTML', ...options })
   const customer = await prisma.customer.findUnique({ where: { telegramUserId: chatId } })
   await prisma.botMessage.create({
     data: {
