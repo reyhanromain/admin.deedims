@@ -1,6 +1,7 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
-import { makeApp, resetDb, tokenFor, authH, prisma, data, meta } from './helpers'
+import { makeApp, resetDb, tokenFor, authH, prisma, data, errOf, meta } from './helpers'
+import { registerTelegramSender } from '../src/bot/notifications'
 
 let app: FastifyInstance
 let token: string
@@ -115,5 +116,106 @@ describe('order mutations', () => {
     await app.inject({ method: 'POST', url: '/api/orders/1/cancellation/approve', headers: authH(token) })
     const res = await app.inject({ method: 'POST', url: '/api/orders/1/cancellation/approve', headers: authH(token) })
     expect(res.statusCode).toBe(404)
+  })
+
+  // Jalur cancel lewat PATCH ditutup supaya pembatalan tidak bisa lolos tanpa
+  // catatan opsional dan tanpa notifikasi pembatalan yang benar.
+  it('patch → cancelled ditolak, arahkan ke endpoint cancel', async () => {
+    const res = await app.inject({ method: 'PATCH', url: '/api/orders/1', headers: authH(token), payload: { orderStatus: 'cancelled' } })
+    expect(res.statusCode).toBe(400)
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: 1 } })).orderStatus).toBe('confirmed')
+  })
+})
+
+describe('pembatalan order oleh admin', () => {
+  const sent: string[] = []
+
+  beforeEach(async () => {
+    sent.length = 0
+    registerTelegramSender(async (_chatId, text) => {
+      sent.push(text)
+      return { message_id: sent.length, date: Math.floor(Date.now() / 1000) }
+    })
+    // Fixture order tidak memakai stock; dipasang di sini agar restore stock terlihat.
+    const item = await prisma.orderItem.findFirstOrThrow({ where: { orderId: 1 } })
+    await prisma.orderItemStockUsage.create({ data: { orderItemId: item.id, stockItemId: 1, quantity: 2 } })
+  })
+  afterEach(() => registerTelegramSender(null))
+
+  it('order confirmed dibatalkan + catatan → status, stock, dan notifikasi customer', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/orders/1/cancel', headers: authH(token), payload: { note: 'Bahan habis, maaf ya kak' } })
+    expect(res.statusCode).toBe(200)
+    expect(data(res)).toMatchObject({ id: 1, status: 'cancelled', pay: 'cancelled', cancelRequested: false, cancellationNote: 'Bahan habis, maaf ya kak' })
+
+    const order = await prisma.order.findUniqueOrThrow({ where: { id: 1 } })
+    expect(order).toMatchObject({ orderStatus: 'cancelled', paymentStatus: 'cancelled', cancelRequested: false, cancellationNote: 'Bahan habis, maaf ya kak' })
+    expect(order.cancelledAt).toBeTruthy()
+    expect((await prisma.stockItem.findUniqueOrThrow({ where: { id: 1 } })).quantity).toBe(52)
+
+    expect(sent).toHaveLength(1)
+    expect(sent[0]).toContain('<b>DD-1</b>')
+    expect(sent[0]).toContain('Catatan dari admin:')
+    expect(sent[0]).toContain('Bahan habis, maaf ya kak')
+    expect(await prisma.botMessage.findFirst({ where: { orderId: 1, direction: 'outgoing' } })).toMatchObject({ intent: 'order_cancelled_by_admin' })
+  })
+
+  it('tanpa catatan → notifikasi tanpa blok catatan', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/orders/1/cancel', headers: authH(token), payload: {} })
+    expect(res.statusCode).toBe(200)
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: 1 } })).cancellationNote).toBeNull()
+    expect(sent[0]).not.toContain('Catatan dari admin:')
+  })
+
+  it('catatan berisi spasi saja dianggap kosong', async () => {
+    await app.inject({ method: 'POST', url: '/api/orders/1/cancel', headers: authH(token), payload: { note: '   ' } })
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: 1 } })).cancellationNote).toBeNull()
+    expect(sent[0]).not.toContain('Catatan dari admin:')
+  })
+
+  // Catatan diketik bebas oleh admin; Telegram memakai parse_mode HTML.
+  it('catatan yang mengandung HTML dikirim ter-escape', async () => {
+    await app.inject({ method: 'POST', url: '/api/orders/1/cancel', headers: authH(token), payload: { note: 'stock <b>habis</b> & tutup' } })
+    expect(sent[0]).toContain('stock &lt;b&gt;habis&lt;/b&gt; &amp; tutup')
+  })
+
+  it('order submitted dan ready juga bisa dibatalkan', async () => {
+    for (const status of ['submitted', 'ready'] as const) {
+      await prisma.order.update({ where: { id: 1 }, data: { orderStatus: status, paymentStatus: 'pending', cancellationNote: null } })
+      const res = await app.inject({ method: 'POST', url: '/api/orders/1/cancel', headers: authH(token), payload: {} })
+      expect(res.statusCode).toBe(200)
+      expect((await prisma.order.findUniqueOrThrow({ where: { id: 1 } })).orderStatus).toBe('cancelled')
+    }
+  })
+
+  it('order completed → 409 dan tidak mengubah apa pun', async () => {
+    await prisma.order.update({ where: { id: 1 }, data: { orderStatus: 'completed' } })
+    const res = await app.inject({ method: 'POST', url: '/api/orders/1/cancel', headers: authH(token), payload: { note: 'telat' } })
+    expect(res.statusCode).toBe(409)
+    expect(errOf(res).code).toBe('ORDER_NOT_CANCELLABLE')
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: 1 } })).orderStatus).toBe('completed')
+    expect((await prisma.stockItem.findUniqueOrThrow({ where: { id: 1 } })).quantity).toBe(50)
+    expect(sent).toHaveLength(0)
+  })
+
+  it('order yang sudah cancelled → 409, stock tidak dikembalikan dua kali', async () => {
+    await app.inject({ method: 'POST', url: '/api/orders/1/cancel', headers: authH(token), payload: {} })
+    const res = await app.inject({ method: 'POST', url: '/api/orders/1/cancel', headers: authH(token), payload: {} })
+    expect(res.statusCode).toBe(409)
+    expect((await prisma.stockItem.findUniqueOrThrow({ where: { id: 1 } })).quantity).toBe(52)
+  })
+
+  it('catatan lebih dari 500 karakter → 400', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/orders/1/cancel', headers: authH(token), payload: { note: 'x'.repeat(501) } })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('order tak ada → 404', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/orders/999/cancel', headers: authH(token), payload: {} })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('detail order membawa catatan pembatalan', async () => {
+    await app.inject({ method: 'POST', url: '/api/orders/1/cancel', headers: authH(token), payload: { note: 'Bahan habis' } })
+    expect(data(await app.inject({ method: 'GET', url: '/api/orders/1', headers: authH(token) })).cancellationNote).toBe('Bahan habis')
   })
 })

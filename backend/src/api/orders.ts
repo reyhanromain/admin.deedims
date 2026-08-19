@@ -8,10 +8,15 @@ import { approveOrderCancellation, BotBusinessError, cancelOrderByAdmin } from '
 import { notifyOrderStatus } from '../bot/notifications'
 
 const patchSchema = z.object({
-  orderStatus: z.enum(['submitted', 'confirmed', 'ready', 'completed', 'cancelled']).optional(),
+  // `cancelled` sengaja tidak ada di sini: pembatalan admin punya endpoint sendiri
+  // (POST /:id/cancel) agar catatan opsional dan notifikasi pembatalan tidak bisa
+  // terlewat lewat jalur PATCH yang generik.
+  orderStatus: z.enum(['submitted', 'confirmed', 'ready', 'completed']).optional(),
   paymentStatus: z.enum(['pending', 'paid', 'cancelled']).optional(),
   adminNotes: z.string().optional(),
 })
+
+const cancelSchema = z.object({ note: z.string().max(500).optional() })
 
 const idOf = (req: { params: unknown }) => Number((req.params as { id: string }).id)
 
@@ -60,7 +65,8 @@ export async function ordersRoutes(app: FastifyInstance) {
       createdAt: order.createdAt, updatedAt: order.updatedAt, status: order.orderStatus, pay: order.paymentStatus,
       // `notes` diisi customer saat checkout mini app (nomor WA + catatannya); read-only bagi admin,
       // terpisah dari `adminNotes` yang memang ditulis admin.
-      notes: order.notes ?? '', adminNotes: order.adminNotes ?? '', cancelRequested: order.cancelRequested, total: order.totalAmount,
+      notes: order.notes ?? '', adminNotes: order.adminNotes ?? '', cancelRequested: order.cancelRequested,
+      cancellationNote: order.cancellationNote ?? '', total: order.totalAmount,
       items: order.items.map((it) => ({
         menuNameSnapshot: it.menuNameSnapshot, variantNameSnapshot: it.variantNameSnapshot, unitPrice: it.unitPrice, quantity: it.quantity,
       })),
@@ -75,14 +81,34 @@ export async function ordersRoutes(app: FastifyInstance) {
 
     const data: Record<string, unknown> = { ...parsed.data }
     if (parsed.data.orderStatus === 'confirmed') data.confirmedAt = new Date()
-    if (parsed.data.orderStatus === 'cancelled') data.cancelledAt = new Date()
 
     const id = idOf(req)
-    const u = parsed.data.orderStatus === 'cancelled'
-      ? await cancelOrderByAdmin(id)
-      : await prisma.order.update({ where: { id }, data })
+    const u = await prisma.order.update({ where: { id }, data })
     if (parsed.data.orderStatus) await notifyOrderStatus(u.id, 'status')
     return ok({ id: u.id, status: u.orderStatus, pay: u.paymentStatus, adminNotes: u.adminNotes ?? '', cancelRequested: u.cancelRequested, updatedAt: u.updatedAt })
+  })
+
+  // POST /api/orders/:id/cancel — pembatalan oleh admin, termasuk order yang sudah
+  // dikonfirmasi. Catatan opsional ikut dikirim ke customer lewat notifikasi Telegram.
+  app.post('/:id/cancel', async (req) => {
+    const parsed = cancelSchema.safeParse(req.body ?? {})
+    if (!parsed.success) throw new HttpError(400, 'Invalid payload', 'VALIDATION')
+
+    const id = idOf(req)
+    if (!await prisma.order.findUnique({ where: { id }, select: { id: true } })) throw new HttpError(404, 'Order tidak ditemukan', 'NOT_FOUND')
+
+    let cancelled
+    try {
+      cancelled = await cancelOrderByAdmin(id, parsed.data.note)
+    } catch (error) {
+      if (error instanceof BotBusinessError && error.code === 'ORDER_NOT_CANCELLABLE') throw new HttpError(409, error.message, 'ORDER_NOT_CANCELLABLE')
+      throw error
+    }
+    await notifyOrderStatus(id, 'cancelled_by_admin')
+    return ok({
+      id: cancelled.id, status: cancelled.orderStatus, pay: cancelled.paymentStatus,
+      cancelRequested: cancelled.cancelRequested, cancellationNote: cancelled.cancellationNote ?? '', updatedAt: cancelled.updatedAt,
+    })
   })
 
   // POST /api/orders/:id/cancellation/approve

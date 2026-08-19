@@ -612,11 +612,23 @@ export async function approveOrderCancellation(orderId: number, reviewerId: numb
   })
 }
 
-export async function cancelOrderByAdmin(orderId: number) {
+/// Status yang masih boleh dibatalkan admin. `completed` sudah diserahkan ke customer
+/// dan `cancelled` tidak punya stock untuk dikembalikan lagi, jadi keduanya ditolak.
+const ADMIN_CANCELLABLE_STATUSES = ['submitted', 'confirmed', 'ready']
+
+export async function cancelOrderByAdmin(orderId: number, note?: string) {
   return prisma.$transaction(async (tx) => {
     const order = await tx.order.findUniqueOrThrow({ where: { id: orderId }, include: { items: { include: { stockUsages: true } } } })
-    if (order.orderStatus !== 'cancelled') await restoreOrderStock(tx, order.items)
-    return tx.order.update({ where: { id: orderId }, data: { orderStatus: 'cancelled', paymentStatus: 'cancelled', cancelRequested: false, cancelledAt: new Date() } })
+    if (!ADMIN_CANCELLABLE_STATUSES.includes(order.orderStatus)) {
+      throw new BotBusinessError('ORDER_NOT_CANCELLABLE', 'Order dengan status ini tidak dapat dibatalkan.')
+    }
+    await restoreOrderStock(tx, order.items)
+    // Catatan kosong disimpan sebagai null supaya notifikasi tidak menambahkan blok kosong.
+    const cancellationNote = note?.trim() || null
+    return tx.order.update({
+      where: { id: orderId },
+      data: { orderStatus: 'cancelled', paymentStatus: 'cancelled', cancelRequested: false, cancelledAt: new Date(), cancellationNote },
+    })
   })
 }
 
