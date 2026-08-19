@@ -165,7 +165,8 @@ export const mapOrderRow = (r: any): OrderRow => ({
 export const mapOrderDetail = (r: any): OrderDetail => ({
   id: r.id, code: r.code, customer: r.customer ?? '', username: r.username ?? '',
   createdAt: fmtDateTime(r.createdAt), updatedAt: fmtDateTime(r.updatedAt), status: r.status, pay: r.pay,
-  notes: r.notes ?? '', adminNotes: r.adminNotes ?? '', cancelRequested: r.cancelRequested, total: r.total,
+  notes: r.notes ?? '', adminNotes: r.adminNotes ?? '', cancelRequested: r.cancelRequested,
+  cancellationNote: r.cancellationNote ?? '', total: r.total,
   items: (r.items ?? []).map((it: any) => ({
     name: it.menuNameSnapshot, meta: variantMeta(it.variantNameSnapshot), qty: it.quantity, price: it.unitPrice,
     addon: it.variantNameSnapshot === 'Add-on',
@@ -286,6 +287,7 @@ export const api = {
   closePreorder: (id: number) => request<{ id: number; status: string }>('POST', `/preorders/${id}/close`),
   completePreorder: (id: number) => request<{ id: number; status: string }>('POST', `/preorders/${id}/complete`),
   patchOrder: (id: number, b: Json) => request<any>('PATCH', `/orders/${id}`, b),
+  cancelOrder: (id: number, note?: string) => request<any>('POST', `/orders/${id}/cancel`, note ? { note } : {}),
   approveCancel: (id: number) => request<any>('POST', `/orders/${id}/cancellation/approve`),
   rejectCancel: (id: number) => request<any>('POST', `/orders/${id}/cancellation/reject`),
   blockCustomer: (id: number, blocked: boolean) => request<{ id: number; blocked: boolean }>('POST', `/customers/${id}/block`, { blocked }),

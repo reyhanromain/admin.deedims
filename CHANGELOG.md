@@ -4,6 +4,16 @@ All notable product changes for Deedims are tracked here.
 
 This project follows [Semantic Versioning](https://semver.org/) for the deployable product version and [Conventional Commits](https://www.conventionalcommits.org/) for commit messages.
 
+## [2.7.0] - 2026-08-19
+
+### Added
+
+- Let an admin cancel an order that is already confirmed or ready, not just a freshly submitted one, through a dedicated `POST /api/orders/:id/cancel`. The CMS order detail now opens a confirmation panel with an optional note (max 500 characters) that is stored on the order as `cancellation_note` and shown in the detail afterwards. Cancelling restores stock and sends the customer a Telegram notification built from two new editable templates, `order_cancelled_by_admin_notification` and `order_cancelled_by_admin_note`; the note block is only appended when the admin wrote one.
+
+### Changed
+
+- `PATCH /api/orders/:id` no longer accepts `orderStatus: cancelled`. Cancellation runs through the new endpoint so it cannot skip the note and the cancellation notification. `completed` and already-cancelled orders are refused with HTTP 409.
+
 ## [2.6.2] - 2026-08-18
 
 ### Fixed

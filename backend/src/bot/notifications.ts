@@ -76,15 +76,27 @@ export async function dispatchPreOrderReminders(preOrderId: number) {
   return { sent: sentCount, failed }
 }
 
-export async function notifyOrderStatus(orderId: number, event: 'status' | 'cancel_approved' | 'cancel_rejected') {
+type OrderNotificationEvent = 'status' | 'cancel_approved' | 'cancel_rejected' | 'cancelled_by_admin'
+
+export async function notifyOrderStatus(orderId: number, event: OrderNotificationEvent) {
   const order = await prisma.order.findUnique({ where: { id: orderId } })
   if (!order?.telegramUserId || !sender) return null
-  const text = event === 'cancel_approved'
-    ? await renderTemplate('order_cancel_approved_notification', { order_code: order.orderCode, order_status: orderStatusLabel(order.orderStatus) })
-    : event === 'cancel_rejected'
-      ? await renderTemplate('order_cancel_rejected_notification', { order_code: order.orderCode })
-      : await renderTemplate('order_status_notification', { order_code: order.orderCode, order_status: orderStatusLabel(order.orderStatus) })
-  return sendTelegramMessage(order.telegramUserId, text, { orderId, intent: `order_${event}` })
+  return sendTelegramMessage(order.telegramUserId, await orderNotificationText(order, event), { orderId, intent: `order_${event}` })
+}
+
+async function orderNotificationText(order: { orderCode: string; orderStatus: string; cancellationNote: string | null }, event: OrderNotificationEvent) {
+  if (event === 'cancel_approved') return renderTemplate('order_cancel_approved_notification', { order_code: order.orderCode, order_status: orderStatusLabel(order.orderStatus) })
+  if (event === 'cancel_rejected') return renderTemplate('order_cancel_rejected_notification', { order_code: order.orderCode })
+  if (event === 'cancelled_by_admin') {
+    const base = await renderTemplate('order_cancelled_by_admin_notification', { order_code: order.orderCode })
+    if (!order.cancellationNote) return base
+    // Blok catatan digabung setelah dirender, bukan lewat placeholder: renderTemplate
+    // meng-escape setiap nilai placeholder, jadi menyisipkan hasil render ke dalam
+    // template lain akan mengubah <b> miliknya sendiri menjadi teks mentah. Catatan
+    // admin yang bebas diketik tetap ter-escape karena ia yang menjadi placeholder.
+    return `${base}\n\n${await renderTemplate('order_cancelled_by_admin_note', { note: order.cancellationNote })}`
+  }
+  return renderTemplate('order_status_notification', { order_code: order.orderCode, order_status: orderStatusLabel(order.orderStatus) })
 }
 
 async function reminderText(preOrder: { title: string | null; description: string | null; fulfillmentStartDate: Date | null; fulfillmentEndDate: Date | null; fulfillmentNote: string | null }) {

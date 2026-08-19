@@ -323,6 +323,7 @@ model Order {
   notes           String?
   adminNotes      String?  @map("admin_notes")
   cancelRequested Boolean  @default(false) @map("cancel_requested") // [CMS] filter cepat badge/KPI
+  cancellationNote String? @map("cancellation_note") // [CMS] catatan opsional admin saat membatalkan; ikut dikirim ke customer
   submittedAt     DateTime? @map("submitted_at")
   confirmedAt     DateTime? @map("confirmed_at")
   cancelledAt     DateTime? @map("cancelled_at")

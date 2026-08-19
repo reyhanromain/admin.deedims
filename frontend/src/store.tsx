@@ -219,6 +219,7 @@ export interface AdminStore extends State {
   setPreorderOrdersPage: (page: number) => void
   // orders
   patchOrder: (id: number, patch: Partial<OrderDetail>) => void
+  cancelOrder: (id: number, note?: string) => void
   approveCancellation: (id: number) => void
   rejectCancellation: (id: number) => void
   // preorders
@@ -537,6 +538,31 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     })()
   }, [debounceSave, fail])
 
+  // Pembatalan oleh admin, termasuk order yang sudah dikonfirmasi. Catatan opsional
+  // ikut dikirim ke customer lewat notifikasi bot, jadi endpointnya terpisah dari patchOrder.
+  const cancelOrder = useCallback((id: number, note?: string) => {
+    const patch: Partial<OrderDetail> = { status: 'cancelled', pay: 'cancelled', cancelRequested: false, cancellationNote: note?.trim() || '' }
+    setState((s) => ({
+      ...s,
+      selectedOrder: s.selectedOrder && s.selectedOrder.id === id ? { ...s.selectedOrder, ...patch } : s.selectedOrder,
+      lists: withRows(s, 'orders', (rows) => rows.map((o) => (o.id === id ? { ...o, status: 'cancelled', pay: 'cancelled', cancelRequested: false } : o))),
+      dashboard: s.dashboard ? { ...s.dashboard, recentOrders: s.dashboard.recentOrders.map((o) => (o.id === id ? { ...o, status: 'cancelled' } : o)) } : s.dashboard,
+    }))
+    void (async () => {
+      try {
+        await api.cancelOrder(id, note?.trim() || undefined)
+        const fresh = await api.order(id)
+        setState((s) => ({
+          ...s,
+          selectedOrder: s.selectedOrder && s.selectedOrder.id === id ? fresh : s.selectedOrder,
+          lists: withRows(s, 'orders', (rows) => rows.map((o) => (o.id === id ? { ...o, status: fresh.status, pay: fresh.pay, cancelRequested: fresh.cancelRequested } : o))),
+        }))
+      } catch (e) {
+        fail(e)
+      }
+    })()
+  }, [fail])
+
   // Review pembatalan order terkonfirmasi: approve = batalkan + kembalikan stock; reject = bersihkan flag.
   const reviewCancellation = useCallback((id: number, approve: boolean) => {
     const patch: Partial<OrderDetail> = approve
@@ -657,6 +683,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         loadList('botMessages', { page: 1, customerId, force: true })
       },
       patchOrder,
+      cancelOrder,
       approveCancellation: (id) => reviewCancellation(id, true),
       rejectCancellation: (id) => reviewCancellation(id, false),
 
@@ -924,7 +951,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       openImage: (img) => { if (img) set({ lightboxImage: img }); else showToast('Belum ada foto — buka Edit untuk menambah') },
       closeLightbox: () => set({ lightboxImage: null }),
     }
-  }, [state, set, update, showToast, ensureScreen, loadDashboard, loadBotMessageCustomers, loadList, loadPreorderOrders, patchOrder, reviewCancellation, saveStock, debounceSave, fail])
+  }, [state, set, update, showToast, ensureScreen, loadDashboard, loadBotMessageCustomers, loadList, loadPreorderOrders, patchOrder, cancelOrder, reviewCancellation, saveStock, debounceSave, fail])
 
   return <AdminContext.Provider value={store}>{children}</AdminContext.Provider>
 }

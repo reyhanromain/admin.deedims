@@ -157,6 +157,8 @@ export interface OrderDetail {
   notes: string
   adminNotes: string
   cancelRequested: boolean
+  /** Catatan opsional yang ditulis admin saat membatalkan order; ikut dikirim ke customer. */
+  cancellationNote: string
   total: number
   items: OrderItem[]
   poTitle: string

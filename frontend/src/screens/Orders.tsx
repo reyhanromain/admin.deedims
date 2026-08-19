@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useAdmin } from '../store'
 import { getTheme, BRAND, orderStatusBadge, payBadge } from '../theme'
 import { fmt } from '../format'
@@ -143,6 +144,9 @@ function OrderDetail() {
   const status = orderStatusBadge(s.dark)
   const pay = payBadge(s.dark)
 
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelNote, setCancelNote] = useState('')
+
   const sel = s.selectedOrder
   if (!sel || sel.id !== s.selectedOrderId) {
     return <div style={{ padding: 36, textAlign: 'center', fontSize: 13.5, color: t.faint }}>Memuat order…</div>
@@ -152,7 +156,9 @@ function OrderDetail() {
   const canConfirm = sel.status === 'submitted'
   const canReady = sel.status === 'confirmed' && !sel.cancelRequested
   const canComplete = sel.status === 'ready'
-  const canCancel = sel.status === 'submitted'
+  // Admin boleh membatalkan sampai order siap; `completed` sudah diserahkan dan
+  // `cancelled` tidak punya stock untuk dikembalikan lagi (dijaga juga di backend).
+  const canCancel = sel.status === 'submitted' || sel.status === 'confirmed' || sel.status === 'ready'
   const canMarkPaid = sel.pay === 'pending' && (sel.status === 'confirmed' || sel.status === 'ready')
 
   return (
@@ -229,10 +235,48 @@ function OrderDetail() {
             {canMarkPaid && (
               <HoverButton onClick={() => { s.patchOrder(sel.id, { pay: 'paid' }); s.showToast('Pembayaran ' + sel.code + ' ditandai lunas') }} style={{ border: `1px solid ${t.inputBorder}`, background: t.surface, color: t.ink, fontSize: 13, fontWeight: 700, borderRadius: 8, padding: '11px 18px', flex: isMobile ? '1 1 100%' : '0 0 auto' }} hover={{ opacity: 0.75 }}>Tandai sudah dibayar</HoverButton>
             )}
-            {canCancel && (
-              <HoverButton onClick={() => { s.patchOrder(sel.id, { status: 'cancelled', pay: 'cancelled' }); s.showToast('Order ' + sel.code + ' dibatalkan, stock dikembalikan') }} style={{ border: `1px solid ${t.dangerBorder}`, background: t.surface, color: BRAND.terracotta, fontSize: 13, fontWeight: 700, borderRadius: 8, padding: '11px 18px', flex: isMobile ? '1 1 100%' : '0 0 auto' }} hover={{ opacity: 0.75 }}>Batalkan order</HoverButton>
+            {canCancel && !cancelling && (
+              <HoverButton onClick={() => setCancelling(true)} style={{ border: `1px solid ${t.dangerBorder}`, background: t.surface, color: BRAND.terracotta, fontSize: 13, fontWeight: 700, borderRadius: 8, padding: '11px 18px', flex: isMobile ? '1 1 100%' : '0 0 auto' }} hover={{ opacity: 0.75 }}>Batalkan order</HoverButton>
             )}
           </div>
+
+          {canCancel && cancelling && (
+            <div style={{ marginTop: 12, border: `1px solid ${t.dangerBorder}`, background: t.dangerBg, borderRadius: 12, padding: 14 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: t.dangerInk }}>Batalkan order {sel.code}?</div>
+              <div style={{ fontSize: 12.5, color: t.dangerSub, marginTop: 2, marginBottom: 10 }}>
+                Stock dikembalikan dan customer langsung menerima notifikasi pembatalan di Telegram.
+              </div>
+              <textarea
+                value={cancelNote}
+                onChange={(e) => setCancelNote(e.target.value)}
+                placeholder="Catatan untuk customer (opsional), mis. alasan pembatalan…"
+                rows={3}
+                maxLength={500}
+                style={inputStyle(t, { fontSize: 13, resize: 'vertical', lineHeight: 1.5 })}
+              />
+              <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                <HoverButton
+                  onClick={() => {
+                    s.cancelOrder(sel.id, cancelNote)
+                    setCancelling(false)
+                    setCancelNote('')
+                    s.showToast('Order ' + sel.code + ' dibatalkan, stock dikembalikan')
+                  }}
+                  style={{ ...btnRed, flex: isMobile ? '1 1 100%' : '0 0 auto' }}
+                  hover={{ background: BRAND.terracottaDark }}
+                >
+                  Ya, batalkan order
+                </HoverButton>
+                <HoverButton
+                  onClick={() => { setCancelling(false); setCancelNote('') }}
+                  style={{ border: `1px solid ${t.inputBorder}`, background: t.surface, color: t.ink, fontSize: 13, fontWeight: 700, borderRadius: 8, padding: '11px 18px', flex: isMobile ? '1 1 100%' : '0 0 auto' }}
+                  hover={{ opacity: 0.75 }}
+                >
+                  Kembali
+                </HoverButton>
+              </div>
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -246,6 +290,14 @@ function OrderDetail() {
               <Row t={t} label="Diperbarui"><span style={{ fontWeight: 700 }}>{sel.updatedAt}</span></Row>
             </div>
           </div>
+
+          {sel.status === 'cancelled' && sel.cancellationNote && (
+            <div style={cardStyle(t, { padding: '18px 20px' })}>
+              <h3 style={{ margin: '0 0 10px 0', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: t.muted }}>Catatan pembatalan</h3>
+              <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{sel.cancellationNote}</div>
+              <div style={{ fontSize: 12, color: t.muted, marginTop: 8 }}>Sudah dikirim ke customer bersama notifikasi pembatalan.</div>
+            </div>
+          )}
 
           {/* Ditulis customer saat checkout — read-only, jangan tercampur dengan catatan admin. */}
           <div style={cardStyle(t, { padding: '18px 20px' })}>
