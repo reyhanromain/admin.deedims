@@ -375,6 +375,18 @@ export const BOT_MESSAGE_TEMPLATES = {
     defaultValue: 'Permintaan pembatalan order {{order_code}} sudah disetujui.\nStatus order: {{order_status}}.',
     placeholders: ['order_code', 'order_status'],
   },
+  order_cancelled_by_admin_notification: {
+    label: 'order_cancelled_by_admin_notification', category: 'bot_messages_my_orders', sortOrder: 621,
+    description: 'Notifikasi saat admin membatalkan order (termasuk order yang sudah dikonfirmasi).',
+    defaultValue: 'Mohon maaf kak, order <b>{{order_code}}</b> dibatalkan oleh admin.\n\nKalau kakak butuh penjelasan lebih lanjut, silakan hubungi admin ya.',
+    placeholders: ['order_code'],
+  },
+  order_cancelled_by_admin_note: {
+    label: 'order_cancelled_by_admin_note', category: 'bot_messages_my_orders', sortOrder: 622,
+    description: 'Blok catatan admin yang ditambahkan ke notifikasi pembatalan, hanya dikirim jika admin mengisi catatan.',
+    defaultValue: 'Catatan dari admin:\n{{note}}',
+    placeholders: ['note'],
+  },
   order_cancel_rejected_notification: {
     label: 'order_cancel_rejected_notification', category: 'bot_messages_my_orders', sortOrder: 620,
     description: 'Notifikasi saat permintaan cancel ditolak.',

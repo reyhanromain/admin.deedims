@@ -16,7 +16,7 @@ vi.mock('../api', async (orig) => {
       botMessagesList: fn(), botMessageCustomers: fn(), menusList: fn(), stockList: fn(), usersList: fn(), settingsList: fn(),
       adjustStock: fn(), createStock: fn(), updateStock: fn(), createMenu: fn(), updateMenu: fn(), toggleMenu: fn(),
       createPreorder: fn(), openPreorder: fn(), closePreorder: fn(), completePreorder: fn(),
-      patchOrder: fn(), approveCancel: fn(), rejectCancel: fn(), blockCustomer: fn(),
+      patchOrder: fn(), cancelOrder: fn(), approveCancel: fn(), rejectCancel: fn(), blockCustomer: fn(),
       createUser: fn(), updateUser: fn(), deleteUser: fn(), updateSetting: fn(),
     },
   }
@@ -31,7 +31,7 @@ const getTokenMock = apiMod.getToken as ReturnType<typeof vi.fn>
 const paged = (rows: any[], extra: Record<string, unknown> = {}) => ({ rows, total: rows.length, page: 1, limit: 20, totalPages: 1, ...extra })
 
 const orderRow = { id: 1, code: 'DD-1', customer: 'Sari', username: 'sari', createdAt: '12 Jun, 09:13', itemsSummary: 'Menu A x1', total: 10000, status: 'confirmed', pay: 'pending', cancelRequested: true }
-const orderDetail = { id: 1, code: 'DD-1', customer: 'Sari', username: 'sari', createdAt: '12 Jun, 09:13', updatedAt: '12 Jun, 10:00', status: 'confirmed', pay: 'pending', adminNotes: '', cancelRequested: true, total: 10000, items: [{ name: 'Menu A', meta: '', qty: 1, price: 10000, addon: false }], poTitle: 'PO Open', poFulfillmentWeek: '22–26 Juni 2026' }
+const orderDetail = { id: 1, code: 'DD-1', customer: 'Sari', username: 'sari', createdAt: '12 Jun, 09:13', updatedAt: '12 Jun, 10:00', status: 'confirmed', pay: 'pending', notes: '', adminNotes: '', cancelRequested: true, cancellationNote: '', total: 10000, items: [{ name: 'Menu A', meta: '', qty: 1, price: 10000, addon: false }], poTitle: 'PO Open', poFulfillmentWeek: '22–26 Juni 2026' }
 const menuRow = { id: 1, name: 'Menu A', description: '', basePrice: 10000, unitLabel: '', active: true, isAddon: false, image: '', variants: [{ name: 'Reg', price: 10000, stockId: 1, qty: 2, image: '' }], addons: [2], freeAddons: [] }
 const stockRow = { id: 1, label: 's1', name: 'Stock 1', quantity: 50, unit: 'pcs' }
 const poOpen = { id: 1, title: 'PO Open', description: '', status: 'open', fulfillmentWeek: '22–26 Juni 2026', note: '', orderCount: 1, revenue: 10000 }
@@ -262,6 +262,49 @@ describe('patchOrder', () => {
     await waitFor(() => expect(r.current.selectedOrder?.id).toBe(1))
     act(() => r.current.patchOrder(1, { status: 'ready' }))
     await waitFor(() => expect(api.patchOrder).toHaveBeenCalledWith(1, { orderStatus: 'ready' }))
+  })
+
+  // Pembatalan admin lewat endpoint sendiri, bukan PATCH: catatan opsionalnya ikut
+  // dikirim ke customer, jadi jalur ini tidak boleh diam-diam jatuh ke patchOrder.
+  it('cancelOrder → endpoint cancel dengan catatan yang sudah di-trim', async () => {
+    api.cancelOrder.mockResolvedValue({ id: 1, status: 'cancelled', pay: 'cancelled', cancelRequested: false, cancellationNote: 'Bahan habis', updatedAt: '2026-06-12T03:00:00Z' })
+    const r = await mountAuthed()
+    await goto(r, 'orders')
+    act(() => r.current.selectOrder(1))
+    await waitFor(() => expect(r.current.selectedOrder?.id).toBe(1))
+
+    api.order.mockResolvedValue({ ...orderDetail, status: 'cancelled', pay: 'cancelled', cancelRequested: false, cancellationNote: 'Bahan habis' })
+    act(() => r.current.cancelOrder(1, '  Bahan habis  '))
+    await waitFor(() => expect(api.cancelOrder).toHaveBeenCalledWith(1, 'Bahan habis'))
+    expect(api.patchOrder).not.toHaveBeenCalled()
+    await waitFor(() => expect(r.current.selectedOrder?.cancellationNote).toBe('Bahan habis'))
+    expect(r.current.selectedOrder?.status).toBe('cancelled')
+    expect(r.current.lists.orders.rows[0]).toMatchObject({ status: 'cancelled', pay: 'cancelled', cancelRequested: false })
+  })
+
+  it('cancelOrder tanpa catatan → tidak mengirim note', async () => {
+    api.cancelOrder.mockResolvedValue({ id: 1, status: 'cancelled', pay: 'cancelled', cancelRequested: false, cancellationNote: '', updatedAt: '2026-06-12T03:00:00Z' })
+    const r = await mountAuthed()
+    await goto(r, 'orders')
+    act(() => r.current.selectOrder(1))
+    await waitFor(() => expect(r.current.selectedOrder?.id).toBe(1))
+    act(() => r.current.cancelOrder(1, '   '))
+    await waitFor(() => expect(api.cancelOrder).toHaveBeenCalledWith(1, undefined))
+  })
+
+  it('cancelOrder optimistic: status berubah sebelum API selesai', async () => {
+    let resolveCancel: (v: unknown) => void = () => {}
+    api.cancelOrder.mockReturnValue(new Promise((resolve) => { resolveCancel = resolve }))
+    const r = await mountAuthed()
+    await goto(r, 'orders')
+    act(() => r.current.selectOrder(1))
+    await waitFor(() => expect(r.current.selectedOrder?.id).toBe(1))
+    act(() => r.current.cancelOrder(1, 'Bahan habis'))
+    expect(r.current.selectedOrder).toMatchObject({ status: 'cancelled', pay: 'cancelled', cancellationNote: 'Bahan habis' })
+
+    api.order.mockResolvedValue({ ...orderDetail, status: 'cancelled', pay: 'cancelled', cancelRequested: false, cancellationNote: 'Bahan habis' })
+    act(() => resolveCancel({ id: 1, status: 'cancelled', pay: 'cancelled', cancelRequested: false, cancellationNote: 'Bahan habis', updatedAt: '2026-06-12T03:00:00Z' }))
+    await waitFor(() => expect(api.order).toHaveBeenCalledTimes(2))
   })
 })
 
