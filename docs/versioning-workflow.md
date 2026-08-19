@@ -107,6 +107,9 @@ The repository workflow validates these rules automatically:
   change-branch SHA.
 - Backend and frontend quality checks must pass before either protected branch
   can be merged.
+- `VERSION` must match the version field in both `package.json` files and both
+  `package-lock.json` files, so a bump cannot land in only some of them
+  (`node scripts/check-version-sources.mjs` runs the same check locally).
 - Branch protection applies to administrators too, so repository owners cannot
   accidentally bypass the PR gates.
 - PRs use merge commits and auto-merge only after required checks succeed.
