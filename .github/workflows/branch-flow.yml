@@ -72,6 +72,9 @@ jobs:
             }
           fi
 
+      - name: Verify version sources agree
+        run: node scripts/check-version-sources.mjs
+
       - name: Install backend dependencies
         working-directory: backend
         run: npm ci
